@@ -33,8 +33,9 @@ EXCHANGE_MAP = {
 
 
 def _table_exists(table_name: str) -> bool:
-    if table_name in _table_cache:
-        return _table_cache[table_name]
+    cached = _table_cache.get(table_name)
+    if cached is True:
+        return True
 
     with get_cursor(dict_cursor=True) as (_, cur):
         cur.execute(
@@ -59,6 +60,7 @@ def _table_columns(table_name: str) -> set[str]:
         return _schema_cache[table_name]
 
     if not _table_exists(table_name):
+        _schema_cache.pop(table_name, None)
         _schema_cache[table_name] = set()
         return _schema_cache[table_name]
 
