@@ -56,8 +56,9 @@ def _table_exists(table_name: str) -> bool:
 
 
 def _table_columns(table_name: str) -> set[str]:
-    if table_name in _schema_cache:
-        return _schema_cache[table_name]
+    cached_columns = _schema_cache.get(table_name)
+    if cached_columns:
+        return cached_columns
 
     if not _table_exists(table_name):
         _schema_cache.pop(table_name, None)
@@ -132,35 +133,26 @@ async def get_stocks_summary():
 @router.get("/api/stocks/all")
 async def get_all_stocks():
     try:
-        cached = market_data_cache.get("stocks:all")
-        if cached is not None:
-            return cached
-
-        if not _table_exists("stocks"):
-            response_payload = {"stocks": [], "total": 0}
-            market_data_cache.set("stocks:all", response_payload)
-            return response_payload
-
-        stock_columns = _table_columns("stocks")
-        asset_metrics_exists = _table_exists("asset_metrics")
-        asset_metric_columns = _table_columns("asset_metrics") if asset_metrics_exists else set()
-        price_history_exists = _table_exists("price_history")
-
-        exchange_expr = _stock_select_expr(stock_columns, "exchange")
-        sector_expr = _stock_select_expr(stock_columns, "sector")
-        pe_expr = _stock_select_expr(stock_columns, "pe_ratio")
-        roe_expr = _stock_select_expr(stock_columns, "roe")
-        beta_expr = _stock_select_expr(stock_columns, "beta")
-        market_cap_expr = _stock_select_expr(stock_columns, "market_cap")
-        revenue_expr = _stock_select_expr(stock_columns, "revenue")
-        dividend_expr = _stock_select_expr(stock_columns, "dividend_yield")
-        asset_class_expr = _stock_select_expr(stock_columns, "asset_class", "'stock'")
-        expected_return_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "expected_return")
-        volatility_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "volatility")
-
-        metrics_join = "LEFT JOIN asset_metrics m ON m.ticker = s.ticker" if asset_metrics_exists else ""
-        price_join = (
-            """
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                """
+                SELECT
+                    s.ticker,
+                    s.name,
+                    s.exchange,
+                    s.sector,
+                    s.pe_ratio,
+                    s.roe,
+                    s.beta,
+                    s.market_cap,
+                    s.revenue,
+                    s.dividend_yield,
+                    COALESCE(s.asset_class, 'stock') AS asset_class,
+                    p.close AS current_price,
+                    m.expected_return,
+                    m.volatility
+                FROM stocks s
+                LEFT JOIN asset_metrics m ON m.ticker = s.ticker
                 LEFT JOIN LATERAL (
                     SELECT close
                     FROM price_history
@@ -168,33 +160,6 @@ async def get_all_stocks():
                     ORDER BY date DESC
                     LIMIT 1
                 ) p ON true
-            """
-            if price_history_exists
-            else ""
-        )
-        current_price_expr = "p.close" if price_history_exists else "NULL"
-
-        with get_cursor(dict_cursor=True) as (_, cur):
-            cur.execute(
-                f"""
-                SELECT
-                    s.ticker,
-                    s.name,
-                    {exchange_expr} AS exchange,
-                    {sector_expr} AS sector,
-                    {pe_expr} AS pe_ratio,
-                    {roe_expr} AS roe,
-                    {beta_expr} AS beta,
-                    {market_cap_expr} AS market_cap,
-                    {revenue_expr} AS revenue,
-                    {dividend_expr} AS dividend_yield,
-                    COALESCE({asset_class_expr}, 'stock') AS asset_class,
-                    {current_price_expr} AS current_price,
-                    {expected_return_expr} AS expected_return,
-                    {volatility_expr} AS volatility
-                FROM stocks s
-                {metrics_join}
-                {price_join}
                 ORDER BY s.ticker
                 """
             )
@@ -216,9 +181,7 @@ async def get_all_stocks():
 
             stocks_list.append(stock_dict)
 
-        response_payload = {"stocks": stocks_list, "total": len(stocks_list)}
-        market_data_cache.set("stocks:all", response_payload)
-        return response_payload
+        return {"stocks": stocks_list, "total": len(stocks_list)}
     except Exception:
         logger.exception("Error fetching securities")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -227,35 +190,26 @@ async def get_all_stocks():
 @router.get("/api/etfs/all")
 async def get_all_etfs():
     try:
-        cached = market_data_cache.get("etfs:all")
-        if cached is not None:
-            return cached
-
-        if not _table_exists("stocks"):
-            response_payload = {"etfs": [], "total": 0}
-            market_data_cache.set("etfs:all", response_payload)
-            return response_payload
-
-        stock_columns = _table_columns("stocks")
-        asset_metrics_exists = _table_exists("asset_metrics")
-        asset_metric_columns = _table_columns("asset_metrics") if asset_metrics_exists else set()
-        price_history_exists = _table_exists("price_history")
-
-        exchange_expr = _stock_select_expr(stock_columns, "exchange")
-        sector_expr = _stock_select_expr(stock_columns, "sector")
-        pe_expr = _stock_select_expr(stock_columns, "pe_ratio")
-        roe_expr = _stock_select_expr(stock_columns, "roe")
-        beta_expr = _stock_select_expr(stock_columns, "beta")
-        market_cap_expr = _stock_select_expr(stock_columns, "market_cap")
-        revenue_expr = _stock_select_expr(stock_columns, "revenue")
-        dividend_expr = _stock_select_expr(stock_columns, "dividend_yield")
-        asset_class_expr = _stock_select_expr(stock_columns, "asset_class", "''")
-        expected_return_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "expected_return")
-        volatility_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "volatility")
-
-        metrics_join = "LEFT JOIN asset_metrics m ON m.ticker = s.ticker" if asset_metrics_exists else ""
-        price_join = (
-            """
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                """
+                SELECT
+                    s.ticker,
+                    s.name,
+                    s.exchange,
+                    s.sector,
+                    s.pe_ratio,
+                    s.roe,
+                    s.beta,
+                    s.market_cap,
+                    s.revenue,
+                    s.dividend_yield,
+                    s.asset_class,
+                    p.close AS current_price,
+                    m.expected_return,
+                    m.volatility
+                FROM stocks s
+                LEFT JOIN asset_metrics m ON m.ticker = s.ticker
                 LEFT JOIN LATERAL (
                     SELECT close
                     FROM price_history
@@ -263,35 +217,7 @@ async def get_all_etfs():
                     ORDER BY date DESC
                     LIMIT 1
                 ) p ON true
-            """
-            if price_history_exists
-            else ""
-        )
-        current_price_expr = "p.close" if price_history_exists else "NULL"
-        etf_filter = "LOWER(COALESCE(s.asset_class, '')) = 'etf'" if "asset_class" in stock_columns else "FALSE"
-
-        with get_cursor(dict_cursor=True) as (_, cur):
-            cur.execute(
-                f"""
-                SELECT
-                    s.ticker,
-                    s.name,
-                    {exchange_expr} AS exchange,
-                    {sector_expr} AS sector,
-                    {pe_expr} AS pe_ratio,
-                    {roe_expr} AS roe,
-                    {beta_expr} AS beta,
-                    {market_cap_expr} AS market_cap,
-                    {revenue_expr} AS revenue,
-                    {dividend_expr} AS dividend_yield,
-                    {asset_class_expr} AS asset_class,
-                    {current_price_expr} AS current_price,
-                    {expected_return_expr} AS expected_return,
-                    {volatility_expr} AS volatility
-                FROM stocks s
-                {metrics_join}
-                {price_join}
-                WHERE {etf_filter}
+                WHERE LOWER(COALESCE(s.asset_class, '')) = 'etf'
                 ORDER BY s.ticker
                 """
             )
@@ -309,9 +235,7 @@ async def get_all_etfs():
                         etf_dict[key] = None
             etfs_list.append(etf_dict)
 
-        response_payload = {"etfs": etfs_list, "total": len(etfs_list)}
-        market_data_cache.set("etfs:all", response_payload)
-        return response_payload
+        return {"etfs": etfs_list, "total": len(etfs_list)}
     except Exception:
         logger.exception("Error fetching ETFs")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -320,35 +244,26 @@ async def get_all_etfs():
 @router.get("/api/bonds/all")
 async def get_all_bonds():
     try:
-        cached = market_data_cache.get("bonds:all")
-        if cached is not None:
-            return cached
-
-        if not _table_exists("stocks"):
-            response_payload = {"bonds": [], "total": 0}
-            market_data_cache.set("bonds:all", response_payload)
-            return response_payload
-
-        stock_columns = _table_columns("stocks")
-        asset_metrics_exists = _table_exists("asset_metrics")
-        asset_metric_columns = _table_columns("asset_metrics") if asset_metrics_exists else set()
-        price_history_exists = _table_exists("price_history")
-
-        exchange_expr = _stock_select_expr(stock_columns, "exchange")
-        sector_expr = _stock_select_expr(stock_columns, "sector")
-        pe_expr = _stock_select_expr(stock_columns, "pe_ratio")
-        roe_expr = _stock_select_expr(stock_columns, "roe")
-        beta_expr = _stock_select_expr(stock_columns, "beta")
-        market_cap_expr = _stock_select_expr(stock_columns, "market_cap")
-        revenue_expr = _stock_select_expr(stock_columns, "revenue")
-        dividend_expr = _stock_select_expr(stock_columns, "dividend_yield")
-        asset_class_expr = _stock_select_expr(stock_columns, "asset_class", "''")
-        expected_return_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "expected_return")
-        volatility_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "volatility")
-
-        metrics_join = "LEFT JOIN asset_metrics m ON m.ticker = s.ticker" if asset_metrics_exists else ""
-        price_join = (
-            """
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                """
+                SELECT
+                    s.ticker,
+                    s.name,
+                    s.exchange,
+                    s.sector,
+                    s.pe_ratio,
+                    s.roe,
+                    s.beta,
+                    s.market_cap,
+                    s.revenue,
+                    s.dividend_yield,
+                    s.asset_class,
+                    p.close AS current_price,
+                    m.expected_return,
+                    m.volatility
+                FROM stocks s
+                LEFT JOIN asset_metrics m ON m.ticker = s.ticker
                 LEFT JOIN LATERAL (
                     SELECT close
                     FROM price_history
@@ -356,35 +271,7 @@ async def get_all_bonds():
                     ORDER BY date DESC
                     LIMIT 1
                 ) p ON true
-            """
-            if price_history_exists
-            else ""
-        )
-        current_price_expr = "p.close" if price_history_exists else "NULL"
-        bond_filter = "LOWER(COALESCE(s.asset_class, '')) = 'bond'" if "asset_class" in stock_columns else "FALSE"
-
-        with get_cursor(dict_cursor=True) as (_, cur):
-            cur.execute(
-                f"""
-                SELECT
-                    s.ticker,
-                    s.name,
-                    {exchange_expr} AS exchange,
-                    {sector_expr} AS sector,
-                    {pe_expr} AS pe_ratio,
-                    {roe_expr} AS roe,
-                    {beta_expr} AS beta,
-                    {market_cap_expr} AS market_cap,
-                    {revenue_expr} AS revenue,
-                    {dividend_expr} AS dividend_yield,
-                    {asset_class_expr} AS asset_class,
-                    {current_price_expr} AS current_price,
-                    {expected_return_expr} AS expected_return,
-                    {volatility_expr} AS volatility
-                FROM stocks s
-                {metrics_join}
-                {price_join}
-                WHERE {bond_filter}
+                WHERE LOWER(COALESCE(s.asset_class, '')) = 'bond'
                 ORDER BY s.ticker
                 """
             )
@@ -402,9 +289,7 @@ async def get_all_bonds():
                         bond_dict[key] = None
             bonds_list.append(bond_dict)
 
-        response_payload = {"bonds": bonds_list, "total": len(bonds_list)}
-        market_data_cache.set("bonds:all", response_payload)
-        return response_payload
+        return {"bonds": bonds_list, "total": len(bonds_list)}
     except Exception:
         logger.exception("Error fetching bonds")
         raise HTTPException(status_code=500, detail="Internal server error")
