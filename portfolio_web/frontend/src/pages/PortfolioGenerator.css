@@ -1,0 +1,394 @@
+.portfolio-generator-root .form-section,
+.portfolio-generator-root .results-section,
+.portfolio-generator-root .chart-card,
+.portfolio-generator-root .holdings-table-wrapper {
+  background: rgba(19, 26, 46, 0.6);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 16px;
+}
+
+.portfolio-generator-root .pg-layout-grid {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+}
+
+.portfolio-generator-root .pg-layout-grid.with-results {
+  grid-template-columns: 360px 1fr;
+}
+
+.portfolio-generator-root .pg-layout-grid.single-column {
+  grid-template-columns: 1fr;
+}
+
+.portfolio-generator-root .pg-section-title,
+.portfolio-generator-root .pg-card-title {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.portfolio-generator-root .pg-page-title {
+  margin: 0 0 6px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.portfolio-generator-root .pg-page-subtitle {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  color: #64748b;
+}
+
+.portfolio-generator-root .pg-sub-title {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.portfolio-generator-root .pg-label-row,
+.portfolio-generator-root .pg-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portfolio-generator-root .pg-input-lg {
+  height: 44px;
+  font-size: 14px;
+}
+
+.portfolio-generator-root .pg-name-input {
+  width: 180px;
+  height: 38px;
+  font-size: 13px;
+}
+
+.portfolio-generator-root .pg-check-input {
+  margin: 0;
+}
+
+.portfolio-generator-root .pg-check-row {
+  cursor: pointer;
+  text-transform: capitalize;
+  font-size: 13px;
+}
+
+.portfolio-generator-root .pg-two-col-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.portfolio-generator-root .pg-compact-group {
+  margin-bottom: 12px;
+}
+
+.portfolio-generator-root .pg-loose-group {
+  margin-bottom: 24px;
+}
+
+.portfolio-generator-root .pg-form-error {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255, 77, 77, 0.1);
+  border: 1px solid rgba(255, 77, 77, 0.3);
+  color: #ff6b6b;
+}
+
+.portfolio-generator-root .pg-loading-head,
+.portfolio-generator-root .pg-chart-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portfolio-generator-root .pg-icon-cyan {
+  color: #22d3ee;
+}
+
+.portfolio-generator-root .pg-loading-grid,
+.portfolio-generator-root .pg-holdings-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.portfolio-generator-root .pg-holdings-stack {
+  gap: 32px;
+  margin-bottom: 32px;
+}
+
+.portfolio-generator-root .pg-results-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+  gap: 12px;
+}
+
+.portfolio-generator-root .pg-results-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portfolio-generator-root .pg-save-message {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.portfolio-generator-root .pg-save-message.success {
+  background: rgba(0, 217, 255, 0.1);
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  color: #22d3ee;
+}
+
+.portfolio-generator-root .pg-save-message.error {
+  background: rgba(255, 77, 77, 0.1);
+  border: 1px solid rgba(255, 77, 77, 0.3);
+  color: #ff6b6b;
+}
+
+.portfolio-generator-root .pg-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.portfolio-generator-root .pg-tooltip-card {
+  min-width: 140px;
+  background: rgba(10, 14, 26, 0.96);
+  border: 1px solid rgba(90, 110, 150, 0.35);
+  padding: 10px 12px;
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  color: #e9f1ff;
+}
+
+.portfolio-generator-root .pg-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.portfolio-generator-root .pg-tooltip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.portfolio-generator-root .pg-tooltip-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.portfolio-generator-root .pg-tooltip-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.3px;
+}
+
+.portfolio-generator-root .form-section,
+.portfolio-generator-root .results-section {
+  padding: 16px;
+}
+
+.portfolio-generator-root .page-header h1 {
+  color: #f8fafc !important;
+}
+
+.portfolio-generator-root .page-subtitle {
+  color: #94a3b8 !important;
+}
+
+.portfolio-generator-root .form-group label {
+  color: #cbd5e1;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.portfolio-generator-root .form-control,
+.portfolio-generator-root select,
+.portfolio-generator-root textarea {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  color: #e2e8f0;
+  border-radius: 10px;
+}
+
+.portfolio-generator-root .form-control:focus,
+.portfolio-generator-root select:focus,
+.portfolio-generator-root textarea:focus {
+  border-color: rgba(34, 211, 238, 0.5);
+  box-shadow: none;
+}
+
+.portfolio-generator-root .form-control:focus-visible,
+.portfolio-generator-root select:focus-visible,
+.portfolio-generator-root textarea:focus-visible,
+.portfolio-generator-root button:focus-visible,
+.portfolio-generator-root .btn:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.68);
+  outline-offset: 2px;
+}
+
+.portfolio-generator-root .metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.portfolio-generator-root .metric-item {
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  background: rgba(15, 23, 42, 0.35);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.portfolio-generator-root .portfolio-summary {
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.35);
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.portfolio-generator-root .summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.portfolio-generator-root .summary-item span {
+  color: #64748b;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.portfolio-generator-root .summary-item strong {
+  color: #f8fafc;
+  font-size: 16px;
+}
+
+.portfolio-generator-root .metric-label {
+  color: #64748b;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.portfolio-generator-root .metric-value {
+  color: #f8fafc;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.portfolio-generator-root .holdings-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.portfolio-generator-root .holdings-table th,
+.portfolio-generator-root .holdings-table td {
+  border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+  padding: 10px;
+  text-align: left;
+}
+
+.portfolio-generator-root .holdings-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.portfolio-generator-root .holdings-table tr {
+  transition: background 0.2s ease;
+}
+
+.portfolio-generator-root .btn,
+.portfolio-generator-root button {
+  transition: all 0.2s ease;
+}
+
+.portfolio-generator-root .btn:hover:not(:disabled),
+.portfolio-generator-root button:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.portfolio-generator-root .holdings-table th {
+  color: #64748b;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.portfolio-generator-root .holdings-table td {
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.portfolio-generator-root .pg-holdings-title {
+  margin-bottom: 14px;
+}
+
+.portfolio-generator-root .pg-market-cell {
+  font-size: 13px;
+  font-weight: 500;
+  color: #cbd5e1;
+}
+
+.portfolio-generator-root .error-message {
+  border-radius: 10px;
+}
+
+@media (max-width: 1150px) {
+  .portfolio-generator-root .pg-layout-grid.with-results {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-generator-root .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .portfolio-generator-root .portfolio-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .portfolio-generator-root .pg-two-col-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-generator-root .pg-results-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .portfolio-generator-root .pg-results-actions {
+    flex-wrap: wrap;
+  }
+
+  .portfolio-generator-root .pg-name-input {
+    width: 100%;
+  }
+
+  .portfolio-generator-root .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}

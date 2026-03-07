@@ -1,0 +1,72 @@
+/* Theme Toggle Styles */
+
+.theme-toggle {
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 12px;
+  transition: background 0.2s ease;
+}
+
+.theme-toggle:hover {
+  background: rgba(0, 217, 255, 0.1);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid #00d9ff;
+  outline-offset: 2px;
+}
+
+.theme-toggle-track {
+  width: 56px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 2px;
+  transition: background 0.3s ease;
+  position: relative;
+}
+
+[data-theme="light"] .theme-toggle-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.theme-toggle-thumb {
+  width: 24px;
+  height: 24px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  color: #050d1a;
+}
+
+.theme-toggle-thumb.dark {
+  transform: translateX(0);
+  background: #1a1a2e;
+  color: #00d9ff;
+}
+
+.theme-toggle-thumb.light {
+  transform: translateX(28px);
+  background: #ffd700;
+  color: #ff8c00;
+}
+
+/* Animation for icon change */
+.theme-toggle-thumb svg {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.theme-toggle:hover .theme-toggle-thumb {
+  transform: scale(1.1);
+}
+
+.theme-toggle:hover .theme-toggle-thumb.light {
+  transform: translateX(28px) scale(1.1);
+}

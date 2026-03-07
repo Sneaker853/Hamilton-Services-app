@@ -1,0 +1,352 @@
+.shell-app {
+  min-height: 100vh;
+  background: #0a0e1a;
+  color: #e2e8f0;
+}
+
+.shell-sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 240px;
+  background: rgba(13, 19, 33, 0.88);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(100, 116, 139, 0.2);
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+  transition: width 0.28s ease;
+}
+
+.shell-sidebar.collapsed {
+  width: 72px;
+}
+
+.shell-sidebar-header {
+  padding: 18px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shell-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: #f8fafc;
+  min-width: 0;
+}
+
+.shell-logo-image {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.shell-brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.shell-brand-text strong {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.shell-brand-text small {
+  font-size: 10px;
+  color: #64748b;
+  letter-spacing: 0.15em;
+}
+
+.shell-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shell-icon-btn {
+  height: 32px;
+  width: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(100, 116, 139, 0.28);
+  background: rgba(15, 23, 42, 0.45);
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shell-icon-btn:hover {
+  color: #e2e8f0;
+  border-color: rgba(34, 211, 238, 0.4);
+}
+
+.shell-icon-btn:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.7);
+  outline-offset: 2px;
+}
+
+.shell-nav-links {
+  flex: 1;
+  padding: 8px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shell-nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.shell-nav-link:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.shell-nav-link.active {
+  color: #22d3ee;
+  background: rgba(6, 182, 212, 0.12);
+}
+
+.shell-nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: #22d3ee;
+}
+
+.shell-nav-link:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.65);
+  outline-offset: 2px;
+}
+
+.shell-nav-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.shell-status-card {
+  margin: 8px 10px 10px;
+  min-height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  background: rgba(19, 26, 46, 0.55);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.shell-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748b;
+}
+
+.shell-status-dot.healthy {
+  background: #22c55e;
+}
+
+.shell-sidebar-footer {
+  border-top: 1px solid rgba(100, 116, 139, 0.2);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shell-user-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shell-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.5);
+  color: #22d3ee;
+  background: rgba(6, 182, 212, 0.12);
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shell-user-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-user-meta span {
+  font-size: 12px;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-user-meta small {
+  font-size: 10px;
+  color: #64748b;
+}
+
+.shell-logout-btn {
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  background: rgba(255, 255, 255, 0.02);
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shell-logout-btn:hover {
+  color: #e2e8f0;
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.shell-logout-btn:focus-visible,
+.shell-mobile-toggle:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.7);
+  outline-offset: 2px;
+}
+
+.shell-main {
+  min-height: 100vh;
+  margin-left: 240px;
+  padding: 20px;
+  transition: margin-left 0.28s ease;
+}
+
+.shell-main.collapsed {
+  margin-left: 72px;
+}
+
+.shell-topbar {
+  min-height: 72px;
+  border: 1px solid rgba(100, 116, 139, 0.18);
+  border-radius: 16px;
+  background: rgba(13, 19, 33, 0.55);
+  backdrop-filter: blur(6px);
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+
+.shell-topbar h1 {
+  margin: 0;
+  font-size: 18px;
+  color: #f8fafc;
+}
+
+.shell-topbar p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.shell-mobile-toggle,
+.shell-sidebar-mobile {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .shell-sidebar {
+    display: none;
+  }
+
+  .shell-main,
+  .shell-main.collapsed {
+    margin-left: 0;
+    padding: 74px 14px 14px;
+  }
+
+  .shell-mobile-toggle {
+    display: inline-flex;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 50;
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    background: rgba(13, 19, 33, 0.88);
+    color: #cbd5e1;
+    border-radius: 10px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .shell-mobile-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.75);
+    z-index: 60;
+  }
+
+  .shell-sidebar-mobile {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 260px;
+    background: #0d1321;
+    border-right: 1px solid rgba(100, 116, 139, 0.2);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 70;
+  }
+
+  .shell-sidebar-mobile.open {
+    transform: translateX(0);
+  }
+
+  .shell-icon-btn.desktop {
+    display: none;
+  }
+}
+
+@media (min-width: 1025px) {
+  .shell-icon-btn.mobile {
+    display: none;
+  }
+}

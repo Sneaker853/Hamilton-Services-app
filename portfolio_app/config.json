@@ -1,0 +1,227 @@
+{
+  "personas": {
+    "growth_seeker": {
+      "display_name": "Growth Seeker",
+      "description": "Focus on high-growth companies with strong earnings momentum. Higher volatility accepted.",
+      "stocks_in_portfolio": 35,
+      "asset_allocation": {
+        "stocks": 1.0,
+        "bonds": 0.0,
+        "defensive_etfs": 0.0
+      },
+      "scoring_weights": {
+        "value": 0.05,
+        "quality": 0.10,
+        "growth": 0.50,
+        "momentum": 0.35,
+        "expected_return": 0.15
+      },
+      "constraints": {
+        "max_weight_per_stock": 0.08,
+        "max_sector_cap": 0.50,
+        "min_holdings": 25
+      },
+      "preferred_tickers": ["NVDA","AAPL","MSFT","AMZN","GOOGL","META","AVGO","AMD"]
+    },
+    "eco_friendly": {
+      "display_name": "Eco Friendly",
+      "description": "Prioritize companies with strong ESG profiles and sustainable practices.",
+      "stocks_in_portfolio": 30,
+      "asset_allocation": {
+        "stocks": 0.80,
+        "bonds": 0.10,
+        "defensive_etfs": 0.10
+      },
+      "constraints": {
+        "max_weight_per_stock": 0.06,
+        "max_sector_cap": 0.35,
+        "min_holdings": 25
+      }
+    },
+    "balanced": {
+      "display_name": "Balanced",
+      "description": "Mix of growth and quality. Moderate diversification and risk.",
+      "stocks_in_portfolio": 30,
+      "asset_allocation": {
+        "stocks": 0.70,
+        "bonds": 0.20,
+        "defensive_etfs": 0.10
+      },
+      "scoring_weights": {
+        "value": 0.25,
+        "quality": 0.30,
+        "growth": 0.25,
+        "momentum": 0.10,
+        "income": 0.10
+      },
+      "constraints": {
+        "max_weight_per_stock": 0.06,
+        "max_sector_cap": 0.40,
+        "min_holdings": 25
+      }
+    },
+    "income_focus": {
+      "display_name": "Income Focus",
+      "description": "High dividend yields with stable, mature companies.",
+      "stocks_in_portfolio": 25,
+      "asset_allocation": {
+        "stocks": 0.50,
+        "bonds": 0.35,
+        "defensive_etfs": 0.15
+      },
+      "scoring_weights": {
+        "value": 0.25,
+        "quality": 0.30,
+        "growth": 0.10,
+        "momentum": 0.05,
+        "income": 0.30
+      },
+      "constraints": {
+        "max_weight_per_stock": 0.05,
+        "max_sector_cap": 0.35,
+        "min_holdings": 25
+      }
+    },
+    "conservative": {
+      "display_name": "Conservative",
+      "description": "Quality companies with strong fundamentals and high diversification.",
+      "stocks_in_portfolio": 40,
+      "asset_allocation": {
+        "stocks": 0.30,
+        "bonds": 0.50,
+        "defensive_etfs": 0.20
+      },
+      "scoring_weights": {
+        "value": 0.45,
+        "quality": 0.45,
+        "growth": 0.05,
+        "momentum": 0.05
+      },
+      "constraints": {
+        "max_weight_per_stock": 0.04,
+        "max_sector_cap": 0.30,
+        "min_holdings": 30
+      }
+    }
+  },
+  "asset_universe": {
+    "bonds": [
+      {
+        "ticker": "BND",
+        "name": "Vanguard Total Bond Market",
+        "expected_return": 0.045,
+        "volatility": 0.06
+      },
+      {
+        "ticker": "TLT",
+        "name": "iShares 20+ Year Treasury",
+        "expected_return": 0.04,
+        "volatility": 0.12
+      },
+      {
+        "ticker": "LQD",
+        "name": "iShares Investment Grade Corporate",
+        "expected_return": 0.055,
+        "volatility": 0.08
+      },
+      {
+        "ticker": "VGIT",
+        "name": "Vanguard Intermediate-Term Treasury",
+        "expected_return": 0.042,
+        "volatility": 0.07
+      },
+      {
+        "ticker": "VCIT",
+        "name": "Vanguard Intermediate-Term Corporate",
+        "expected_return": 0.053,
+        "volatility": 0.07
+      }
+    ],
+    "defensive_etfs": [
+      {
+        "ticker": "VYM",
+        "name": "Vanguard High Dividend Yield",
+        "expected_return": 0.068,
+        "volatility": 0.14
+      },
+      {
+        "ticker": "SCHD",
+        "name": "Schwab US Dividend Equity",
+        "expected_return": 0.065,
+        "volatility": 0.13
+      },
+      {
+        "ticker": "SDY",
+        "name": "SPDR S&P Dividend",
+        "expected_return": 0.064,
+        "volatility": 0.13
+      },
+      {
+        "ticker": "VTV",
+        "name": "Vanguard Value",
+        "expected_return": 0.07,
+        "volatility": 0.14
+      }
+    ]
+  },
+  "scoring_weights": {
+    "value": 0.40,
+    "quality": 0.30,
+    "growth": 0.20,
+    "momentum": 0.10
+  },
+  "fundamentals": {
+    "pe_ratio": {
+      "lower_is_better": true,
+      "outlier_threshold": 100
+    },
+    "roe": {
+      "lower_is_better": false,
+      "outlier_threshold": 100
+    },
+    "debt_to_equity": {
+      "lower_is_better": true,
+      "outlier_threshold": 5
+    },
+    "eps_growth": {
+      "lower_is_better": false,
+      "outlier_threshold": 1.0
+    },
+    "dividend_yield": {
+      "lower_is_better": false,
+      "outlier_threshold": 20
+    }
+  },
+  "screening": {
+    "universe": "sp500",
+    "rebalance_frequency": "quarterly",
+    "lookback_window_days": 252,
+    "min_price_history_days": 504
+  },
+  "estimation": {
+    "version": "estimation-v2-2026-02",
+    "covariance_method": "ledoit_wolf",
+    "return_estimator": "ff5_blend",
+    "asset_class_priors": {
+      "stock": 0.08,
+      "etf": 0.07,
+      "bond": 0.04,
+      "crypto": 0.14,
+      "commodity": 0.06
+    },
+    "return_bounds": {
+      "stock": [-0.15, 0.30],
+      "etf": [-0.10, 0.20],
+      "bond": [-0.02, 0.12],
+      "crypto": [-0.40, 0.80],
+      "commodity": [-0.20, 0.35]
+    },
+    "vol_bounds": {
+      "stock": [0.08, 0.65],
+      "etf": [0.04, 0.45],
+      "bond": [0.02, 0.25],
+      "crypto": [0.25, 1.50],
+      "commodity": [0.10, 0.80]
+    }
+  }
+}
