@@ -36,6 +36,7 @@ from config import (
     PASSWORD_RESET_TOKEN_TTL_MINUTES,
     APP_PUBLIC_URL,
     APP_ENV,
+    ADMIN_ALLOWED_EMAIL,
 )
 from emailer import send_email
 
@@ -157,6 +158,7 @@ def _send_password_reset_email(email: str, token: str) -> None:
 @router.post("/register", response_model=AuthResponse)
 async def register_user(request: AuthRegisterRequest, response: Response):
     email = request.email.strip().lower()
+    is_owner_email = email == ADMIN_ALLOWED_EMAIL
     if "@" not in email:
         raise HTTPException(status_code=400, detail="Invalid email address")
     _validate_password_strength(request.password)
@@ -169,11 +171,11 @@ async def register_user(request: AuthRegisterRequest, response: Response):
         password_data = hash_password(request.password)
         cur.execute(
             """
-            INSERT INTO app_users (email, password_hash, password_salt)
-            VALUES (%s, %s, %s)
+            INSERT INTO app_users (email, password_hash, password_salt, is_admin)
+            VALUES (%s, %s, %s, %s)
             RETURNING id, email, is_admin, email_verified, created_at
             """,
-            (email, password_data["hash"], password_data["salt"]),
+            (email, password_data["hash"], password_data["salt"], is_owner_email),
         )
         user = cur.fetchone()
         conn.commit()
@@ -214,6 +216,22 @@ async def login_user(request: AuthLoginRequest, response: Response):
 
     if not verify_password(request.password, user["password_hash"], user["password_salt"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if email == ADMIN_ALLOWED_EMAIL and not bool(user.get("is_admin", False)):
+        with get_cursor(dict_cursor=True) as (conn, cur):
+            cur.execute(
+                """
+                UPDATE app_users
+                SET is_admin = TRUE
+                WHERE id = %s
+                RETURNING is_admin
+                """,
+                (user["id"],),
+            )
+            updated = cur.fetchone()
+            conn.commit()
+            if updated:
+                user["is_admin"] = bool(updated.get("is_admin", True))
 
     if EMAIL_VERIFICATION_REQUIRED:
         with get_cursor(dict_cursor=True) as (_, cur):

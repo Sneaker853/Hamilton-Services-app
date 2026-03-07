@@ -14,6 +14,8 @@ from security import require_admin_user, resolve_auth_token
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["market-data"])
 market_data_cache = TTLCache(MARKET_DATA_CACHE_TTL_SECONDS)
+_schema_cache: dict[str, set[str]] = {}
+_table_cache: dict[str, bool] = {}
 
 
 EXCHANGE_MAP = {
@@ -28,6 +30,62 @@ EXCHANGE_MAP = {
     "PNK": "Pink Sheets",
     "OQB": "OTC",
 }
+
+
+def _table_exists(table_name: str) -> bool:
+    if table_name in _table_cache:
+        return _table_cache[table_name]
+
+    with get_cursor(dict_cursor=True) as (_, cur):
+        cur.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = %s
+            ) AS exists
+            """,
+            (table_name,),
+        )
+        exists = bool(cur.fetchone()["exists"])
+
+    _table_cache[table_name] = exists
+    return exists
+
+
+def _table_columns(table_name: str) -> set[str]:
+    if table_name in _schema_cache:
+        return _schema_cache[table_name]
+
+    if not _table_exists(table_name):
+        _schema_cache[table_name] = set()
+        return _schema_cache[table_name]
+
+    with get_cursor(dict_cursor=True) as (_, cur):
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = %s
+            """,
+            (table_name,),
+        )
+        columns = {row["column_name"] for row in cur.fetchall()}
+
+    _schema_cache[table_name] = columns
+    return columns
+
+
+def _stock_select_expr(stock_columns: set[str], column: str, fallback: str = "NULL") -> str:
+    return f"s.{column}" if column in stock_columns else fallback
+
+
+def _metric_select_expr(asset_metrics_exists: bool, asset_metric_columns: set[str], column: str) -> str:
+    if asset_metrics_exists and column in asset_metric_columns:
+        return f"m.{column}"
+    return "NULL"
 
 
 @router.get("/api/stocks/summary")
@@ -76,18 +134,31 @@ async def get_all_stocks():
         if cached is not None:
             return cached
 
-        with get_cursor(dict_cursor=True) as (_, cur):
-            cur.execute(
-                """
-                SELECT
-                    s.ticker, s.name, s.exchange, s.sector,
-                    s.pe_ratio, s.roe, s.beta, s.market_cap, s.revenue,
-                    s.dividend_yield, COALESCE(s.asset_class, 'stock') as asset_class,
-                    p.close as current_price,
-                    m.expected_return, m.volatility,
-                    m.confidence_score, m.residual_std, m.return_estimator
-                FROM stocks s
-                LEFT JOIN asset_metrics m ON m.ticker = s.ticker
+        if not _table_exists("stocks"):
+            response_payload = {"stocks": [], "total": 0}
+            market_data_cache.set("stocks:all", response_payload)
+            return response_payload
+
+        stock_columns = _table_columns("stocks")
+        asset_metrics_exists = _table_exists("asset_metrics")
+        asset_metric_columns = _table_columns("asset_metrics") if asset_metrics_exists else set()
+        price_history_exists = _table_exists("price_history")
+
+        exchange_expr = _stock_select_expr(stock_columns, "exchange")
+        sector_expr = _stock_select_expr(stock_columns, "sector")
+        pe_expr = _stock_select_expr(stock_columns, "pe_ratio")
+        roe_expr = _stock_select_expr(stock_columns, "roe")
+        beta_expr = _stock_select_expr(stock_columns, "beta")
+        market_cap_expr = _stock_select_expr(stock_columns, "market_cap")
+        revenue_expr = _stock_select_expr(stock_columns, "revenue")
+        dividend_expr = _stock_select_expr(stock_columns, "dividend_yield")
+        asset_class_expr = _stock_select_expr(stock_columns, "asset_class", "'stock'")
+        expected_return_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "expected_return")
+        volatility_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "volatility")
+
+        metrics_join = "LEFT JOIN asset_metrics m ON m.ticker = s.ticker" if asset_metrics_exists else ""
+        price_join = (
+            """
                 LEFT JOIN LATERAL (
                     SELECT close
                     FROM price_history
@@ -95,6 +166,33 @@ async def get_all_stocks():
                     ORDER BY date DESC
                     LIMIT 1
                 ) p ON true
+            """
+            if price_history_exists
+            else ""
+        )
+        current_price_expr = "p.close" if price_history_exists else "NULL"
+
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                f"""
+                SELECT
+                    s.ticker,
+                    s.name,
+                    {exchange_expr} AS exchange,
+                    {sector_expr} AS sector,
+                    {pe_expr} AS pe_ratio,
+                    {roe_expr} AS roe,
+                    {beta_expr} AS beta,
+                    {market_cap_expr} AS market_cap,
+                    {revenue_expr} AS revenue,
+                    {dividend_expr} AS dividend_yield,
+                    COALESCE({asset_class_expr}, 'stock') AS asset_class,
+                    {current_price_expr} AS current_price,
+                    {expected_return_expr} AS expected_return,
+                    {volatility_expr} AS volatility
+                FROM stocks s
+                {metrics_join}
+                {price_join}
                 ORDER BY s.ticker
                 """
             )
@@ -131,18 +229,31 @@ async def get_all_etfs():
         if cached is not None:
             return cached
 
-        with get_cursor(dict_cursor=True) as (_, cur):
-            cur.execute(
-                """
-                SELECT
-                    s.ticker, s.name, s.exchange, s.sector,
-                    s.pe_ratio, s.roe, s.beta, s.market_cap, s.revenue,
-                    s.dividend_yield, s.asset_class,
-                    p.close as current_price,
-                    m.expected_return, m.volatility,
-                    m.confidence_score, m.residual_std, m.return_estimator
-                FROM stocks s
-                LEFT JOIN asset_metrics m ON m.ticker = s.ticker
+        if not _table_exists("stocks"):
+            response_payload = {"etfs": [], "total": 0}
+            market_data_cache.set("etfs:all", response_payload)
+            return response_payload
+
+        stock_columns = _table_columns("stocks")
+        asset_metrics_exists = _table_exists("asset_metrics")
+        asset_metric_columns = _table_columns("asset_metrics") if asset_metrics_exists else set()
+        price_history_exists = _table_exists("price_history")
+
+        exchange_expr = _stock_select_expr(stock_columns, "exchange")
+        sector_expr = _stock_select_expr(stock_columns, "sector")
+        pe_expr = _stock_select_expr(stock_columns, "pe_ratio")
+        roe_expr = _stock_select_expr(stock_columns, "roe")
+        beta_expr = _stock_select_expr(stock_columns, "beta")
+        market_cap_expr = _stock_select_expr(stock_columns, "market_cap")
+        revenue_expr = _stock_select_expr(stock_columns, "revenue")
+        dividend_expr = _stock_select_expr(stock_columns, "dividend_yield")
+        asset_class_expr = _stock_select_expr(stock_columns, "asset_class", "''")
+        expected_return_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "expected_return")
+        volatility_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "volatility")
+
+        metrics_join = "LEFT JOIN asset_metrics m ON m.ticker = s.ticker" if asset_metrics_exists else ""
+        price_join = (
+            """
                 LEFT JOIN LATERAL (
                     SELECT close
                     FROM price_history
@@ -150,7 +261,35 @@ async def get_all_etfs():
                     ORDER BY date DESC
                     LIMIT 1
                 ) p ON true
-                WHERE LOWER(COALESCE(s.asset_class, '')) = 'etf'
+            """
+            if price_history_exists
+            else ""
+        )
+        current_price_expr = "p.close" if price_history_exists else "NULL"
+        etf_filter = "LOWER(COALESCE(s.asset_class, '')) = 'etf'" if "asset_class" in stock_columns else "FALSE"
+
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                f"""
+                SELECT
+                    s.ticker,
+                    s.name,
+                    {exchange_expr} AS exchange,
+                    {sector_expr} AS sector,
+                    {pe_expr} AS pe_ratio,
+                    {roe_expr} AS roe,
+                    {beta_expr} AS beta,
+                    {market_cap_expr} AS market_cap,
+                    {revenue_expr} AS revenue,
+                    {dividend_expr} AS dividend_yield,
+                    {asset_class_expr} AS asset_class,
+                    {current_price_expr} AS current_price,
+                    {expected_return_expr} AS expected_return,
+                    {volatility_expr} AS volatility
+                FROM stocks s
+                {metrics_join}
+                {price_join}
+                WHERE {etf_filter}
                 ORDER BY s.ticker
                 """
             )
@@ -183,18 +322,31 @@ async def get_all_bonds():
         if cached is not None:
             return cached
 
-        with get_cursor(dict_cursor=True) as (_, cur):
-            cur.execute(
-                """
-                SELECT
-                    s.ticker, s.name, s.exchange, s.sector,
-                    s.pe_ratio, s.roe, s.beta, s.market_cap, s.revenue,
-                    s.dividend_yield, s.asset_class,
-                    p.close as current_price,
-                    m.expected_return, m.volatility,
-                    m.confidence_score, m.residual_std, m.return_estimator
-                FROM stocks s
-                LEFT JOIN asset_metrics m ON m.ticker = s.ticker
+        if not _table_exists("stocks"):
+            response_payload = {"bonds": [], "total": 0}
+            market_data_cache.set("bonds:all", response_payload)
+            return response_payload
+
+        stock_columns = _table_columns("stocks")
+        asset_metrics_exists = _table_exists("asset_metrics")
+        asset_metric_columns = _table_columns("asset_metrics") if asset_metrics_exists else set()
+        price_history_exists = _table_exists("price_history")
+
+        exchange_expr = _stock_select_expr(stock_columns, "exchange")
+        sector_expr = _stock_select_expr(stock_columns, "sector")
+        pe_expr = _stock_select_expr(stock_columns, "pe_ratio")
+        roe_expr = _stock_select_expr(stock_columns, "roe")
+        beta_expr = _stock_select_expr(stock_columns, "beta")
+        market_cap_expr = _stock_select_expr(stock_columns, "market_cap")
+        revenue_expr = _stock_select_expr(stock_columns, "revenue")
+        dividend_expr = _stock_select_expr(stock_columns, "dividend_yield")
+        asset_class_expr = _stock_select_expr(stock_columns, "asset_class", "''")
+        expected_return_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "expected_return")
+        volatility_expr = _metric_select_expr(asset_metrics_exists, asset_metric_columns, "volatility")
+
+        metrics_join = "LEFT JOIN asset_metrics m ON m.ticker = s.ticker" if asset_metrics_exists else ""
+        price_join = (
+            """
                 LEFT JOIN LATERAL (
                     SELECT close
                     FROM price_history
@@ -202,7 +354,35 @@ async def get_all_bonds():
                     ORDER BY date DESC
                     LIMIT 1
                 ) p ON true
-                WHERE LOWER(COALESCE(s.asset_class, '')) = 'bond'
+            """
+            if price_history_exists
+            else ""
+        )
+        current_price_expr = "p.close" if price_history_exists else "NULL"
+        bond_filter = "LOWER(COALESCE(s.asset_class, '')) = 'bond'" if "asset_class" in stock_columns else "FALSE"
+
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                f"""
+                SELECT
+                    s.ticker,
+                    s.name,
+                    {exchange_expr} AS exchange,
+                    {sector_expr} AS sector,
+                    {pe_expr} AS pe_ratio,
+                    {roe_expr} AS roe,
+                    {beta_expr} AS beta,
+                    {market_cap_expr} AS market_cap,
+                    {revenue_expr} AS revenue,
+                    {dividend_expr} AS dividend_yield,
+                    {asset_class_expr} AS asset_class,
+                    {current_price_expr} AS current_price,
+                    {expected_return_expr} AS expected_return,
+                    {volatility_expr} AS volatility
+                FROM stocks s
+                {metrics_join}
+                {price_join}
+                WHERE {bond_filter}
                 ORDER BY s.ticker
                 """
             )
