@@ -136,6 +136,13 @@ async def get_all_stocks():
         with get_cursor(dict_cursor=True) as (_, cur):
             cur.execute(
                 """
+                WITH latest_prices AS (
+                    SELECT DISTINCT ON (ticker)
+                        ticker,
+                        close
+                    FROM price_history
+                    ORDER BY ticker, date DESC
+                )
                 SELECT
                     s.ticker,
                     s.name,
@@ -148,18 +155,12 @@ async def get_all_stocks():
                     s.revenue,
                     s.dividend_yield,
                     COALESCE(s.asset_class, 'stock') AS asset_class,
-                    p.close AS current_price,
+                    lp.close AS current_price,
                     m.expected_return,
                     m.volatility
                 FROM stocks s
                 LEFT JOIN asset_metrics m ON m.ticker = s.ticker
-                LEFT JOIN LATERAL (
-                    SELECT close
-                    FROM price_history
-                    WHERE ticker = s.ticker
-                    ORDER BY date DESC
-                    LIMIT 1
-                ) p ON true
+                LEFT JOIN latest_prices lp ON lp.ticker = s.ticker
                 ORDER BY s.ticker
                 """
             )
@@ -193,6 +194,13 @@ async def get_all_etfs():
         with get_cursor(dict_cursor=True) as (_, cur):
             cur.execute(
                 """
+                WITH latest_prices AS (
+                    SELECT DISTINCT ON (ticker)
+                        ticker,
+                        close
+                    FROM price_history
+                    ORDER BY ticker, date DESC
+                )
                 SELECT
                     s.ticker,
                     s.name,
@@ -205,18 +213,12 @@ async def get_all_etfs():
                     s.revenue,
                     s.dividend_yield,
                     s.asset_class,
-                    p.close AS current_price,
+                    lp.close AS current_price,
                     m.expected_return,
                     m.volatility
                 FROM stocks s
                 LEFT JOIN asset_metrics m ON m.ticker = s.ticker
-                LEFT JOIN LATERAL (
-                    SELECT close
-                    FROM price_history
-                    WHERE ticker = s.ticker
-                    ORDER BY date DESC
-                    LIMIT 1
-                ) p ON true
+                LEFT JOIN latest_prices lp ON lp.ticker = s.ticker
                 WHERE LOWER(COALESCE(s.asset_class, '')) = 'etf'
                 ORDER BY s.ticker
                 """
@@ -247,6 +249,13 @@ async def get_all_bonds():
         with get_cursor(dict_cursor=True) as (_, cur):
             cur.execute(
                 """
+                WITH latest_prices AS (
+                    SELECT DISTINCT ON (ticker)
+                        ticker,
+                        close
+                    FROM price_history
+                    ORDER BY ticker, date DESC
+                )
                 SELECT
                     s.ticker,
                     s.name,
@@ -259,18 +268,12 @@ async def get_all_bonds():
                     s.revenue,
                     s.dividend_yield,
                     s.asset_class,
-                    p.close AS current_price,
+                    lp.close AS current_price,
                     m.expected_return,
                     m.volatility
                 FROM stocks s
                 LEFT JOIN asset_metrics m ON m.ticker = s.ticker
-                LEFT JOIN LATERAL (
-                    SELECT close
-                    FROM price_history
-                    WHERE ticker = s.ticker
-                    ORDER BY date DESC
-                    LIMIT 1
-                ) p ON true
+                LEFT JOIN latest_prices lp ON lp.ticker = s.ticker
                 WHERE LOWER(COALESCE(s.asset_class, '')) = 'bond'
                 ORDER BY s.ticker
                 """
