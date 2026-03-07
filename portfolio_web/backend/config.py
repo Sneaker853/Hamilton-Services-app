@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -57,5 +58,8 @@ def get_allowed_origins() -> list[str]:
     if origins_env:
         return [origin.strip() for origin in origins_env.split(",") if origin.strip()]
     if APP_ENV == "production":
-        raise RuntimeError("CORS_ALLOWED_ORIGINS must be set when APP_ENV=production")
+        parsed = urlparse(APP_PUBLIC_URL)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return [f"{parsed.scheme}://{parsed.netloc}"]
+        raise RuntimeError("CORS_ALLOWED_ORIGINS must be set when APP_ENV=production or APP_PUBLIC_URL must be a valid URL")
     return ["http://localhost:3000", "http://localhost:8080"]
