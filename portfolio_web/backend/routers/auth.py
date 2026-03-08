@@ -30,8 +30,6 @@ from config import (
     SESSION_COOKIE_NAME,
     CSRF_COOKIE_NAME,
     SESSION_TTL_HOURS,
-    SESSION_COOKIE_SECURE,
-    SESSION_COOKIE_SAMESITE,
     EMAIL_VERIFICATION_REQUIRED,
     EMAIL_VERIFICATION_TOKEN_TTL_HOURS,
     PASSWORD_RESET_TOKEN_TTL_MINUTES,
@@ -72,8 +70,8 @@ def _set_session_cookie(response: Response, token: str) -> None:
         key=SESSION_COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=SESSION_COOKIE_SECURE,
-        samesite=SESSION_COOKIE_SAMESITE,
+        secure=True,
+        samesite="none",
         max_age=SESSION_TTL_HOURS * 3600,
         path="/",
     )
@@ -84,8 +82,8 @@ def _set_csrf_cookie(response: Response, csrf_token: str) -> None:
         key=CSRF_COOKIE_NAME,
         value=csrf_token,
         httponly=False,
-        secure=SESSION_COOKIE_SECURE,
-        samesite=SESSION_COOKIE_SAMESITE,
+        secure=True,
+        samesite="none",
         max_age=SESSION_TTL_HOURS * 3600,
         path="/",
     )
@@ -377,12 +375,14 @@ async def logout_user(
     response.delete_cookie(
         key=SESSION_COOKIE_NAME,
         path="/",
-        samesite=SESSION_COOKIE_SAMESITE,
+        secure=True,
+        samesite="none",
     )
     response.delete_cookie(
         key=CSRF_COOKIE_NAME,
         path="/",
-        samesite=SESSION_COOKIE_SAMESITE,
+        secure=True,
+        samesite="none",
     )
 
     return {"success": True}
