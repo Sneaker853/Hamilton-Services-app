@@ -110,6 +110,13 @@ function AppContent() {
         return;
       }
 
+      const stored = localStorage.getItem('authUser');
+      const csrfCookie = getCookieValue('portfolio_csrf_token');
+      if (!stored && !csrfCookie) {
+        setAuthUser(null);
+        return;
+      }
+
       try {
         const response = await axios.get(`${API_BASE}/auth/me`, { timeout: 5000, withCredentials: true });
         const user = response?.data;
@@ -121,7 +128,6 @@ function AppContent() {
       } catch (_err) {
       }
 
-      const stored = localStorage.getItem('authUser');
       if (stored) {
         try {
           setAuthUser(JSON.parse(stored));
