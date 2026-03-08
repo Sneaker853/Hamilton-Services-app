@@ -105,7 +105,7 @@ function AppContent() {
       }
 
       try {
-        const response = await axios.get(`${API_BASE}/auth/me`, { timeout: 5000 });
+        const response = await axios.get(`${API_BASE}/auth/me`, { timeout: 5000, withCredentials: true });
         const user = response?.data;
         if (user?.email) {
           setAuthUser(user);
@@ -134,7 +134,7 @@ function AppContent() {
 
   const handleSignOut = async () => {
     try {
-      await axios.post(`${API_BASE}/auth/logout`, {}, { timeout: 5000 });
+      await axios.post(`${API_BASE}/auth/logout`, {}, { timeout: 5000, withCredentials: true });
     } catch (err) {
       console.warn('Logout request failed:', err.message);
     }
