@@ -33,6 +33,10 @@ SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "portfolio_session")
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "true" if APP_ENV == "production" else "false").strip().lower() == "true"
 SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "none" if APP_ENV == "production" else "lax").strip().lower()
+if SESSION_COOKIE_SAMESITE not in {"lax", "strict", "none"}:
+    SESSION_COOKIE_SAMESITE = "none" if APP_ENV == "production" else "lax"
+if SESSION_COOKIE_SAMESITE == "none":
+    SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_NAME = os.getenv("CSRF_COOKIE_NAME", "portfolio_csrf_token")
 CSRF_PROTECTION_ENABLED = os.getenv("CSRF_PROTECTION_ENABLED", "true").strip().lower() == "true"
 EMAIL_VERIFICATION_REQUIRED = os.getenv("EMAIL_VERIFICATION_REQUIRED", "false").strip().lower() == "true"
