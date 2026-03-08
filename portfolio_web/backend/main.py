@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from config import get_allowed_origins
+from config import get_allowed_origins, get_allowed_origin_regex, origin_is_allowed
 from db import init_db_pool, close_db_pool, check_db_health
 from services import initialize_services
 from migrations_runner import run_migrations
@@ -45,6 +45,8 @@ _error_count = 0
 _total_latency_ms = 0.0
 _auth_limiter = SlidingWindowRateLimiter(limit=AUTH_RATE_LIMIT, window_seconds=RATE_LIMIT_WINDOW_SECONDS)
 _admin_limiter = SlidingWindowRateLimiter(limit=ADMIN_RATE_LIMIT, window_seconds=RATE_LIMIT_WINDOW_SECONDS)
+_allowed_origins = set(get_allowed_origins())
+_allowed_origin_regex = get_allowed_origin_regex()
 
 CSRF_EXEMPT_PATHS = {
     "/api/auth/login",
@@ -54,6 +56,16 @@ CSRF_EXEMPT_PATHS = {
     "/api/auth/verify-email/confirm",
 }
 CSRF_PROTECTED_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+CSRF_PROTECTED_PATHS = {
+    "/api/auth/logout",
+    "/api/portfolios/save",
+    "/api/admin/update-fundamentals",
+}
+
+
+def _path_requires_csrf(path: str) -> bool:
+    normalized = path.rstrip("/") or "/"
+    return normalized in CSRF_PROTECTED_PATHS
 
 app = FastAPI(
     title="Portfolio Optimizer API",
@@ -63,11 +75,25 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_allowed_origins(),
+    allow_origins=list(_allowed_origins),
+    allow_origin_regex=_allowed_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _corsify_early_response(request: Request, response: JSONResponse) -> JSONResponse:
+    origin = (request.headers.get("origin") or "").rstrip("/")
+    if origin and origin_is_allowed(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        existing_vary = response.headers.get("Vary")
+        if not existing_vary:
+            response.headers["Vary"] = "Origin"
+        elif "Origin" not in existing_vary:
+            response.headers["Vary"] = f"{existing_vary}, Origin"
+    return response
 
 
 @app.on_event("startup")
@@ -114,7 +140,7 @@ async def request_context_middleware(request: Request, call_next):
     if request.url.path.startswith("/api/auth"):
         result = _auth_limiter.check(client_id)
         if not result.allowed:
-            return JSONResponse(
+            return _corsify_early_response(request, JSONResponse(
                 status_code=429,
                 headers={"X-Request-ID": request_id, "Retry-After": str(result.reset_seconds)},
                 content={
@@ -125,12 +151,12 @@ async def request_context_middleware(request: Request, call_next):
                     "request_id": request_id,
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
-            )
+            ))
 
     if request.url.path.startswith("/api/admin"):
         result = _admin_limiter.check(client_id)
         if not result.allowed:
-            return JSONResponse(
+            return _corsify_early_response(request, JSONResponse(
                 status_code=429,
                 headers={"X-Request-ID": request_id, "Retry-After": str(result.reset_seconds)},
                 content={
@@ -141,11 +167,11 @@ async def request_context_middleware(request: Request, call_next):
                     "request_id": request_id,
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
-            )
+            ))
 
     if (
         CSRF_PROTECTION_ENABLED
-        and request.url.path.startswith("/api")
+        and _path_requires_csrf(request.url.path)
         and request.method.upper() in CSRF_PROTECTED_METHODS
         and request.url.path not in CSRF_EXEMPT_PATHS
     ):
@@ -154,17 +180,30 @@ async def request_context_middleware(request: Request, call_next):
             cookie_csrf = request.cookies.get(CSRF_COOKIE_NAME)
             header_csrf = request.headers.get("X-CSRF-Token")
             expected_csrf = get_session_csrf_token(session_cookie)
+            origin = (request.headers.get("origin") or "").rstrip("/")
+            trusted_origin = bool(origin and origin_is_allowed(origin))
 
-            csrf_valid = (
-                bool(cookie_csrf)
-                and bool(header_csrf)
+            header_mode_valid = (
+                bool(header_csrf)
                 and bool(expected_csrf)
-                and secrets.compare_digest(str(cookie_csrf), str(header_csrf))
                 and secrets.compare_digest(str(header_csrf), str(expected_csrf))
+                and (not cookie_csrf or secrets.compare_digest(str(cookie_csrf), str(header_csrf)))
             )
 
+            # Cross-origin first-party frontend cannot read backend-domain cookies, so
+            # allow trusted-origin requests to validate using cookie token vs session token.
+            trusted_origin_cookie_mode_valid = (
+                trusted_origin
+                and not header_csrf
+                and bool(cookie_csrf)
+                and bool(expected_csrf)
+                and secrets.compare_digest(str(cookie_csrf), str(expected_csrf))
+            )
+
+            csrf_valid = header_mode_valid or trusted_origin_cookie_mode_valid
+
             if not csrf_valid:
-                return JSONResponse(
+                return _corsify_early_response(request, JSONResponse(
                     status_code=403,
                     headers={"X-Request-ID": request_id},
                     content={
@@ -175,7 +214,7 @@ async def request_context_middleware(request: Request, call_next):
                         "request_id": request_id,
                         "timestamp": datetime.now(UTC).isoformat(),
                     },
-                )
+                ))
     try:
         response = await call_next(request)
         status_code = response.status_code

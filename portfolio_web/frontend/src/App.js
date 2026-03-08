@@ -34,9 +34,29 @@ import Mission from './pages/Mission';
 // - Development: CRA proxy fallback
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const PROD_API_BASE = 'https://hamilton-services-backend.onrender.com/api';
-const API_BASE = process.env.REACT_APP_API_URL || (IS_PRODUCTION ? PROD_API_BASE : '/api');
+const normalizeApiBase = (value) => String(value || '').trim().replace(/\/+$/, '');
+const isLocalApiBase = (value) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(String(value || '').trim());
+const ENV_API_BASE = normalizeApiBase(process.env.REACT_APP_API_URL);
+const API_BASE = (() => {
+  if (IS_PRODUCTION) {
+    if (ENV_API_BASE && !isLocalApiBase(ENV_API_BASE)) {
+      return ENV_API_BASE;
+    }
+    return PROD_API_BASE;
+  }
+  return ENV_API_BASE || '/api';
+})();
 const ADMIN_ALLOWED_EMAIL = 'loris@spatafora.ca';
-axios.defaults.withCredentials = true;
+axios.defaults.withCredentials = false;
+
+const shouldSendCredentials = (requestUrl) => {
+  const url = String(requestUrl || '');
+  return (
+    url.includes('/auth/')
+    || url.includes('/portfolios')
+    || url.includes('/admin/')
+  );
+};
 
 const getCookieValue = (name) => {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -46,8 +66,11 @@ const getCookieValue = (name) => {
 
 axios.interceptors.request.use((config) => {
   const requestUrl = String(config?.url || '');
-  if (requestUrl.includes('/auth/')) {
+  if (shouldSendCredentials(requestUrl)) {
     config.withCredentials = true;
+  } else if (typeof config.withCredentials === 'undefined') {
+    // Public market/portfolio compute endpoints should avoid ambient session cookies.
+    config.withCredentials = false;
   }
 
   const method = String(config?.method || 'get').toUpperCase();

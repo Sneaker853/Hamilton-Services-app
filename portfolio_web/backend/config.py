@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from urllib.parse import urlparse
 from dotenv import load_dotenv
@@ -57,14 +58,61 @@ MARKET_DATA_CACHE_TTL_SECONDS = int(os.getenv("MARKET_DATA_CACHE_TTL_SECONDS", "
 PORTFOLIO_RISK_FREE_RATE = float(os.getenv("PORTFOLIO_RISK_FREE_RATE", "0.02"))
 ADMIN_ALLOWED_EMAIL = os.getenv("ADMIN_ALLOWED_EMAIL", "loris@spatafora.ca").strip().lower()
 
+PRODUCTION_REQUIRED_ORIGINS = [
+    "https://hamilton-services.ca",
+    "https://www.hamilton-services.ca",
+    "https://hamilton-services-frontend.onrender.com",
+]
+DEFAULT_PRODUCTION_CORS_ORIGIN_REGEX = r"^https://([a-z0-9-]+\.)?hamilton-services\.ca$"
+
+
+def _normalize_origin(origin: str) -> str:
+    return origin.strip().rstrip("/")
+
 
 def get_allowed_origins() -> list[str]:
     origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+    origins: list[str] = []
+
     if origins_env:
-        return [origin.strip() for origin in origins_env.split(",") if origin.strip()]
-    if APP_ENV == "production":
+        origins.extend(_normalize_origin(origin) for origin in origins_env.split(",") if origin.strip())
+    elif APP_ENV == "production":
         parsed = urlparse(APP_PUBLIC_URL)
         if parsed.scheme in {"http", "https"} and parsed.netloc:
-            return [f"{parsed.scheme}://{parsed.netloc}"]
-        raise RuntimeError("CORS_ALLOWED_ORIGINS must be set when APP_ENV=production or APP_PUBLIC_URL must be a valid URL")
-    return ["http://localhost:3000", "http://localhost:8080"]
+            origins.append(f"{parsed.scheme}://{parsed.netloc}")
+        else:
+            raise RuntimeError("CORS_ALLOWED_ORIGINS must be set when APP_ENV=production or APP_PUBLIC_URL must be a valid URL")
+    else:
+        origins.extend(["http://localhost:3000", "http://localhost:8080"])
+
+    if APP_ENV == "production":
+        origins.extend(PRODUCTION_REQUIRED_ORIGINS)
+
+    deduped = list(dict.fromkeys(_normalize_origin(origin) for origin in origins if origin))
+    if APP_ENV == "production" and not deduped:
+        raise RuntimeError("CORS_ALLOWED_ORIGINS must be configured in production")
+    return deduped
+
+
+def get_allowed_origin_regex() -> str | None:
+    regex_env = os.getenv("CORS_ALLOWED_ORIGIN_REGEX", "").strip()
+    if regex_env:
+        return regex_env
+    if APP_ENV == "production":
+        return DEFAULT_PRODUCTION_CORS_ORIGIN_REGEX
+    return None
+
+
+def origin_is_allowed(origin: str) -> bool:
+    normalized = _normalize_origin(origin)
+    if not normalized:
+        return False
+
+    if normalized in get_allowed_origins():
+        return True
+
+    regex = get_allowed_origin_regex()
+    if regex and re.match(regex, normalized):
+        return True
+
+    return False

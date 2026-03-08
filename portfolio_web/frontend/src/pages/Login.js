@@ -5,6 +5,25 @@ import './Login.css';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const PROD_API_BASE = 'https://hamilton-services-backend.onrender.com/api';
+const normalizeApiBase = (value) => String(value || '').trim().replace(/\/+$/, '');
+const isLocalApiBase = (value) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(String(value || '').trim());
+
+const resolveApiBase = (apiBase) => {
+  const normalizedPropBase = normalizeApiBase(apiBase);
+  if (normalizedPropBase) {
+    return normalizedPropBase;
+  }
+
+  const envBase = normalizeApiBase(process.env.REACT_APP_API_URL);
+  if (IS_PRODUCTION) {
+    if (envBase && !isLocalApiBase(envBase)) {
+      return envBase;
+    }
+    return PROD_API_BASE;
+  }
+
+  return envBase || '/api';
+};
 
 const Login = ({ apiBase, fullScreen = false }) => {
   const [mode, setMode] = useState('login');
@@ -26,7 +45,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
     const run = async () => {
       if (verifyToken) {
         try {
-          const baseUrl = apiBase || (IS_PRODUCTION ? PROD_API_BASE : '/api');
+          const baseUrl = resolveApiBase(apiBase);
           await axios.post(`${baseUrl}/auth/verify-email/confirm`, { token: verifyToken }, { withCredentials: true, timeout: 10000 });
           setInfoMessage('Email verified successfully. You can now sign in.');
         } catch (err) {
@@ -86,7 +105,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
 
     setLoading(true);
     try {
-      const baseUrl = apiBase || (IS_PRODUCTION ? PROD_API_BASE : '/api');
+      const baseUrl = resolveApiBase(apiBase);
       if (mode === 'forgot') {
         const response = await axios.post(`${baseUrl}/auth/password-reset/request`, { email }, { timeout: 10000, withCredentials: true });
         const debugLink = response?.data?.debug_link;
