@@ -33,7 +33,8 @@ import Mission from './pages/Mission';
 // - Production: explicit REACT_APP_API_URL (or same-origin /api reverse proxy)
 // - Development: CRA proxy fallback
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const API_BASE = process.env.REACT_APP_API_URL || (IS_PRODUCTION ? '/api' : '/api');
+const PROD_API_BASE = 'https://hamilton-services-backend.onrender.com/api';
+const API_BASE = process.env.REACT_APP_API_URL || (IS_PRODUCTION ? PROD_API_BASE : '/api');
 const ADMIN_ALLOWED_EMAIL = 'loris@spatafora.ca';
 axios.defaults.withCredentials = true;
 
@@ -44,6 +45,11 @@ const getCookieValue = (name) => {
 };
 
 axios.interceptors.request.use((config) => {
+  const requestUrl = String(config?.url || '');
+  if (requestUrl.includes('/auth/')) {
+    config.withCredentials = true;
+  }
+
   const method = String(config?.method || 'get').toUpperCase();
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     const csrfToken = getCookieValue('portfolio_csrf_token');

@@ -3,6 +3,9 @@ import axios from 'axios';
 import logo from '../assets/hamilton-services-logo-notext.png';
 import './Login.css';
 
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const PROD_API_BASE = 'https://hamilton-services-backend.onrender.com/api';
+
 const Login = ({ apiBase, fullScreen = false }) => {
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
@@ -23,7 +26,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
     const run = async () => {
       if (verifyToken) {
         try {
-          const baseUrl = apiBase || '/api';
+          const baseUrl = apiBase || (IS_PRODUCTION ? PROD_API_BASE : '/api');
           await axios.post(`${baseUrl}/auth/verify-email/confirm`, { token: verifyToken }, { withCredentials: true, timeout: 10000 });
           setInfoMessage('Email verified successfully. You can now sign in.');
         } catch (err) {
@@ -83,7 +86,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
 
     setLoading(true);
     try {
-      const baseUrl = apiBase || '/api';
+      const baseUrl = apiBase || (IS_PRODUCTION ? PROD_API_BASE : '/api');
       if (mode === 'forgot') {
         const response = await axios.post(`${baseUrl}/auth/password-reset/request`, { email }, { timeout: 10000, withCredentials: true });
         const debugLink = response?.data?.debug_link;
