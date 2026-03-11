@@ -123,7 +123,7 @@ const PortfolioGenerator = ({ apiBase }) => {
         setPersonas(response.data);
       } catch (error) {
         console.error('Error fetching personas:', error);
-        setError('Failed to load personas');
+        setError('Unable to load investment profiles. Please refresh the page.');
       } finally {
         setPersonasLoading(false);
       }
@@ -152,7 +152,7 @@ const PortfolioGenerator = ({ apiBase }) => {
       setPortfolio(response.data);
     } catch (error) {
       console.error('Error generating portfolio:', error);
-      setError(error.response?.data?.message || error.response?.data?.error || error.response?.data?.detail || 'Failed to generate portfolio');
+      setError(error.response?.data?.message || error.response?.data?.error || error.response?.data?.detail || 'Unable to generate your portfolio. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -259,7 +259,7 @@ const PortfolioGenerator = ({ apiBase }) => {
       setSaveMessage('Portfolio saved.');
     } catch (err) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
-      setSaveMessage(apiMessage || 'Failed to save portfolio.');
+      setSaveMessage(apiMessage || 'Unable to save your portfolio. Please try again.');
     } finally {
       setSaving(false);
     }

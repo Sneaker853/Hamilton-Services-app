@@ -124,8 +124,8 @@ const ChartsPanel = ({
             <h3 className="pb-sub-title">Risk vs Return</h3>
             <span className={`pb-model-badge ${isBackendFrontierActive ? 'backend' : 'fallback'}`}>
               {isBackendFrontierActive
-                ? 'Backend covariance model'
-                : `Local fallback (${frontierFallbackReason || 'backend unavailable'})`}
+                ? 'Advanced covariance model'
+                : 'Estimated model'}
             </span>
           </div>
         </CardHeader>

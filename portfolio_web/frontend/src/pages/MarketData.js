@@ -26,7 +26,7 @@ const MarketData = ({ apiBase }) => {
       setStocks(response.data.stocks || []);
     } catch (fetchError) {
       console.error('Error fetching stocks:', fetchError);
-      setError('Failed to load stocks');
+      setError('Unable to load market data. Please try again.');
     }
   }, [apiBase]);
 
@@ -48,7 +48,7 @@ const MarketData = ({ apiBase }) => {
       setStockDetails(response.data);
     } catch (fetchError) {
       console.error('Error fetching stock details:', fetchError);
-      setError('Failed to load stock details');
+      setError('Unable to load security details. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ const MarketData = ({ apiBase }) => {
       setPriceHistory(response.data.data || []);
     } catch (fetchError) {
       console.error('Error fetching price history:', fetchError);
-      setError('Failed to load price history');
+      setError('Unable to load price history. Please try again.');
     } finally {
       setLoading(false);
     }

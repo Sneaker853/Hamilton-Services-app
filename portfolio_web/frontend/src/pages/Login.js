@@ -5,6 +5,7 @@ import './Login.css';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const PROD_API_BASE = 'https://hamilton-services-backend.onrender.com/api';
+const REQUEST_TIMEOUT = IS_PRODUCTION ? 45000 : 10000;
 const normalizeApiBase = (value) => String(value || '').trim().replace(/\/+$/, '');
 const isLocalApiBase = (value) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(String(value || '').trim());
 
@@ -46,7 +47,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
       if (verifyToken) {
         try {
           const baseUrl = resolveApiBase(apiBase);
-          await axios.post(`${baseUrl}/auth/verify-email/confirm`, { token: verifyToken }, { withCredentials: true, timeout: 10000 });
+          await axios.post(`${baseUrl}/auth/verify-email/confirm`, { token: verifyToken }, { withCredentials: true, timeout: REQUEST_TIMEOUT });
           setInfoMessage('Email verified successfully. You can now sign in.');
         } catch (err) {
           setError(err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail || 'Email verification failed.');
@@ -107,7 +108,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
     try {
       const baseUrl = resolveApiBase(apiBase);
       if (mode === 'forgot') {
-        const response = await axios.post(`${baseUrl}/auth/password-reset/request`, { email }, { timeout: 10000, withCredentials: true });
+        const response = await axios.post(`${baseUrl}/auth/password-reset/request`, { email }, { timeout: REQUEST_TIMEOUT, withCredentials: true });
         const debugLink = response?.data?.debug_link;
         setInfoMessage(response?.data?.message || 'If your account exists, a password reset link has been sent.');
         if (debugLink) {
@@ -117,7 +118,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
         await axios.post(
           `${baseUrl}/auth/password-reset/confirm`,
           { token: resetToken, new_password: password },
-          { timeout: 10000, withCredentials: true }
+          { timeout: REQUEST_TIMEOUT, withCredentials: true }
         );
         setInfoMessage('Password reset successful. You can now sign in.');
         setMode('login');
@@ -125,7 +126,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
         setConfirmPassword('');
       } else {
         const endpoint = mode === 'signup' ? `${baseUrl}/auth/register` : `${baseUrl}/auth/login`;
-        const response = await axios.post(endpoint, { email, password }, { timeout: 10000, withCredentials: true });
+        const response = await axios.post(endpoint, { email, password }, { timeout: REQUEST_TIMEOUT, withCredentials: true });
         const { user } = response.data || {};
         if (!user) {
           throw new Error('Invalid response from server.');
@@ -144,9 +145,13 @@ const Login = ({ apiBase, fullScreen = false }) => {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
       
       if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timeout. Is the backend running on port 8000?';
+        errorMessage = IS_PRODUCTION
+          ? 'The server is taking longer than expected to respond. Please try again in a moment.'
+          : 'Request timeout. Is the backend running on port 8000?';
       } else if (err.message === 'Network Error') {
-        errorMessage = 'Network error. Make sure the backend is running (run start_backend.bat)';
+        errorMessage = IS_PRODUCTION
+          ? 'Unable to reach the server. Please check your connection and try again.'
+          : 'Network error. Make sure the backend is running (run start_backend.bat)';
       } else if (err.response?.status === 400) {
         errorMessage = apiMessage || 'Invalid email or password.';
       } else if (err.response?.status === 401) {
@@ -156,7 +161,9 @@ const Login = ({ apiBase, fullScreen = false }) => {
       } else if (apiMessage) {
         errorMessage = apiMessage;
       } else if (err.response?.status === 502 || err.response?.status === 503) {
-        errorMessage = 'Backend service unavailable. Make sure the backend is running.';
+        errorMessage = IS_PRODUCTION
+          ? 'The service is temporarily unavailable. Please try again in a few moments.'
+          : 'Backend service unavailable. Make sure the backend is running.';
       }
       
       setError(errorMessage);

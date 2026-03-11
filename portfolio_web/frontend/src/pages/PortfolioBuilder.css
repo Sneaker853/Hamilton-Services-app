@@ -335,6 +335,7 @@
   border: 1px solid rgba(100, 116, 139, 0.2);
   border-radius: 8px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0;
   margin-bottom: 20px;
 }

@@ -48,7 +48,7 @@ const AdminPanel = ({ apiBase }) => {
     } catch (error) {
       const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.response?.data?.detail;
       setMessageType('error');
-      setMessage(`Failed to start update: ${apiMessage || error.message}`);
+      setMessage(apiMessage || 'The update could not be started. Please try again.');
     } finally {
       setUpdating(false);
     }

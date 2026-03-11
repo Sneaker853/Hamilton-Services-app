@@ -160,11 +160,11 @@ const PortfolioBuilder = ({ apiBase }) => {
         setAllSecurities(Array.from(uniqueByTicker.values()));
         
         if (stocks.length === 0 && etfs.length === 0 && bonds.length === 0) {
-          setError('No securities available');
+          setError('No securities are currently available. Please try again later.');
         }
       } catch (error) {
         console.error('Error fetching securities:', error);
-        setError('Failed to load securities');
+        setError('Unable to load securities. Please refresh the page and try again.');
         } finally {
           setLoadingSecurities(false);
       }
@@ -250,7 +250,7 @@ const PortfolioBuilder = ({ apiBase }) => {
           String(security.name || '').toLowerCase().includes(normalizedSearch)
         );
       })
-      .slice(0, 250);
+;
 
     setFilteredSecurities(filtered);
   }, [searchTerm, assetFilter, marketFilter, financialSectorFilter, allSecurities]);
