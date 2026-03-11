@@ -95,12 +95,50 @@ def download_prices(ticker_map, end_date):
     
     return prices_data
 
+
+def ensure_price_history_id_default(conn, cur):
+    """Ensure price_history.id auto-increments in environments where default is missing."""
+    cur.execute(
+        """
+        SELECT column_default, is_identity
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'price_history'
+          AND column_name = 'id'
+        """
+    )
+    row = cur.fetchone()
+
+    if not row:
+        return
+
+    column_default, is_identity = row
+    if column_default is not None or is_identity == 'YES':
+        return
+
+    cur.execute("SELECT COALESCE(MAX(id), 0) FROM price_history")
+    max_id = int(cur.fetchone()[0] or 0)
+
+    cur.execute("CREATE SEQUENCE IF NOT EXISTS price_history_id_seq")
+    if max_id > 0:
+        cur.execute("SELECT setval('price_history_id_seq', %s, true)", (max_id,))
+    else:
+        cur.execute("SELECT setval('price_history_id_seq', 1, false)")
+
+    cur.execute("ALTER TABLE price_history ALTER COLUMN id SET DEFAULT nextval('price_history_id_seq')")
+    cur.execute("ALTER SEQUENCE price_history_id_seq OWNED BY price_history.id")
+    conn.commit()
+    print("Configured auto-increment default for price_history.id")
+
 def insert_prices(prices_data):
     """Insert prices into database"""
     conn = psycopg2.connect(f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
     cur = conn.cursor()
+
+    ensure_price_history_id_default(conn, cur)
     
     total_inserted = 0
+    failed_tickers = 0
     for ticker, prices in prices_data.items():
         print(f"Inserting {ticker}...", end="", flush=True)
         
@@ -119,11 +157,12 @@ def insert_prices(prices_data):
             print(f" OK ({len(prices)} records)")
         except Exception as e:
             conn.rollback()
+            failed_tickers += 1
             print(f" ERROR: {str(e)[:60]}")
     
     cur.close()
     conn.close()
-    return total_inserted
+    return total_inserted, failed_tickers
 
 if __name__ == "__main__":
     conn = psycopg2.connect(f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
@@ -161,7 +200,11 @@ if __name__ == "__main__":
     
     if prices_data:
         print(f"\nInserting {len(prices_data)} assets into database...\n")
-        total = insert_prices(prices_data)
+        total, failed_tickers = insert_prices(prices_data)
         print(f"\nCompleted! {len(prices_data)} assets with {total:,} total records")
+        if failed_tickers:
+            print(f"Tickers with insert failures: {failed_tickers}")
+        if total == 0:
+            raise SystemExit("Price ingestion inserted 0 records; failing job.")
     else:
         print("No price data downloaded")
