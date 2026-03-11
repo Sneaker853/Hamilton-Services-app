@@ -69,7 +69,6 @@ const ConfidenceBadge = ({ holding }) => {
       <span className={`pb-confidence-badge ${level}`} title={confidenceHelp}>
         {pct}%
       </span>
-      <small className="pb-confidence-source">{estimatorLabel}</small>
     </div>
   );
 };

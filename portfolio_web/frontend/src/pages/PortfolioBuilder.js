@@ -958,8 +958,8 @@ const PortfolioBuilder = ({ apiBase }) => {
     backendFrontier.signature === activeHoldingsSignature &&
     backendFrontier.frontier.length > 1;
   const frontierModelLabel = isBackendFrontierActive
-    ? 'Frontier: Backend covariance model'
-    : `Frontier: Local fallback model (${frontierFallbackReason || 'backend unavailable'})`;
+    ? 'Advanced covariance model'
+    : 'Estimated model';
   const totalWeight = portfolio.reduce((sum, p) => sum + p.weight, 0);
   const allocationGap = Math.abs(totalWeight - 100);
   const holdings = portfolio.filter(p => p.weight > 0);
