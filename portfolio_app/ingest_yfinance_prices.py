@@ -164,6 +164,23 @@ def insert_prices(prices_data):
     conn.close()
     return total_inserted, failed_tickers
 
+
+def fetch_price_history_latest_snapshot():
+    """Return latest date currently stored in DB and how many tickers have that latest date."""
+    conn = psycopg2.connect(f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
+    cur = conn.cursor()
+    cur.execute("SELECT MAX(date) FROM price_history")
+    latest_date = cur.fetchone()[0]
+
+    ticker_count = 0
+    if latest_date is not None:
+        cur.execute("SELECT COUNT(DISTINCT ticker) FROM price_history WHERE date = %s", (latest_date,))
+        ticker_count = int(cur.fetchone()[0] or 0)
+
+    cur.close()
+    conn.close()
+    return latest_date, ticker_count
+
 if __name__ == "__main__":
     conn = psycopg2.connect(f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
     cur = conn.cursor()
@@ -196,7 +213,7 @@ if __name__ == "__main__":
             latest_downloaded_date = series_latest
 
     if latest_downloaded_date:
-        print(f"Latest downloaded price date: {latest_downloaded_date}")
+        print(f"LATEST_DOWNLOADED_PRICE_DATE={latest_downloaded_date}")
     
     if prices_data:
         print(f"\nInserting {len(prices_data)} assets into database...\n")
@@ -204,6 +221,10 @@ if __name__ == "__main__":
         print(f"\nCompleted! {len(prices_data)} assets with {total:,} total records")
         if failed_tickers:
             print(f"Tickers with insert failures: {failed_tickers}")
+        latest_db_date, latest_db_ticker_count = fetch_price_history_latest_snapshot()
+        if latest_db_date:
+            print(f"LATEST_DB_PRICE_DATE={latest_db_date}")
+            print(f"LATEST_DB_PRICE_TICKER_COUNT={latest_db_ticker_count}")
         if total == 0:
             raise SystemExit("Price ingestion inserted 0 records; failing job.")
     else:
