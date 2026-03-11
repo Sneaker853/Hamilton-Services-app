@@ -4,7 +4,7 @@ import { ResponsiveContainer, Area, AreaChart, CartesianGrid, Tooltip, XAxis, YA
 import { FiBarChart2, FiSearch, FiTrendingDown, FiTrendingUp } from 'react-icons/fi';
 import './MarketData.css';
 
-const periods = ['1D', '1W', '1M', '3M', '6M', '1Y', '5Y', 'MAX'];
+const periods = ['1W', '1M', '3M', '6M', '1Y', '5Y', 'MAX'];
 
 const MarketData = ({ apiBase }) => {
   const [stocks, setStocks] = useState([]);
