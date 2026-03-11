@@ -169,20 +169,17 @@ def insert_prices(prices_data):
         print(f"Inserting {ticker}...", end="", flush=True)
         
         try:
+            min_batch_date = min(p['date'] for p in prices)
+            cur.execute(
+                "DELETE FROM price_history WHERE ticker = %s AND date >= %s",
+                (ticker, min_batch_date),
+            )
+
             batch = [(p['ticker'], p['date'], p['open'], p['high'], p['low'], p['close'], p['volume']) 
                      for p in prices]
             
             cur.executemany(
-                """
-                INSERT INTO price_history (ticker, date, open, high, low, close, volume)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (ticker, date) DO UPDATE SET
-                    open = EXCLUDED.open,
-                    high = EXCLUDED.high,
-                    low = EXCLUDED.low,
-                    close = EXCLUDED.close,
-                    volume = EXCLUDED.volume
-                """,
+                "INSERT INTO price_history (ticker, date, open, high, low, close, volume) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                 batch
             )
             conn.commit()
