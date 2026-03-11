@@ -20,7 +20,7 @@
 }
 
 .shell-sidebar.collapsed {
-  width: 72px;
+  width: 84px;
 }
 
 .shell-sidebar-header {
@@ -253,7 +253,37 @@
 }
 
 .shell-main.collapsed {
-  margin-left: 72px;
+  margin-left: 84px;
+}
+
+.shell-sidebar.collapsed .shell-sidebar-header {
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 8px;
+  gap: 8px;
+}
+
+.shell-sidebar.collapsed .shell-brand {
+  justify-content: center;
+}
+
+.shell-sidebar.collapsed .shell-header-actions {
+  justify-content: center;
+}
+
+.shell-sidebar.collapsed .shell-status-card {
+  width: 38px;
+  margin: 8px auto 10px;
+  padding: 0;
+  justify-content: center;
+}
+
+.shell-sidebar.collapsed .shell-sidebar-footer {
+  align-items: center;
+}
+
+.shell-sidebar.collapsed .shell-user-row {
+  justify-content: center;
 }
 
 .shell-topbar {

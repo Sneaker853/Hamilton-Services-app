@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { FiTrendingUp, FiBarChart2, FiAlertTriangle, FiTarget, FiRefreshCw, FiShield, FiActivity, FiGrid } from 'react-icons/fi';
 import { Card, CardHeader, CardBody, PerformanceLineChart, EfficientFrontierChart, CorrelationHeatmap } from '../components';
 import { formatPct, formatNum } from './portfolioBuilderUtils';
@@ -172,14 +172,6 @@ const AnalyticsPanel = ({
   costBps,
   onCostBpsChange,
 }) => {
-  const panelBodyRef = useRef(null);
-
-  useEffect(() => {
-    if (panelBodyRef.current) {
-      panelBodyRef.current.focus();
-    }
-  }, [activeTab]);
-
   const needsRun = !['frontier', 'correlation'].includes(activeTab);
   return (
   <Card variant="default" className="pb-analytics-card">
@@ -236,14 +228,6 @@ const AnalyticsPanel = ({
         )}
       </div>
       <div className="pb-analytics-body">
-        <div
-          ref={panelBodyRef}
-          tabIndex={-1}
-          className="sr-only"
-          aria-live="polite"
-        >
-          {`Active analytics tab: ${ANALYTICS_TABS.find((tab) => tab.key === activeTab)?.label || activeTab}`}
-        </div>
         {activeTab === 'frontier' && (
           <div id="analytics-panel-frontier" role="tabpanel" aria-labelledby="analytics-tab-frontier">
           {frontierData && frontierData.length > 1
