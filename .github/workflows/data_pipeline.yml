@@ -1,0 +1,96 @@
+name: Daily Data Pipeline
+
+on:
+  schedule:
+    # Runs at 21:30 UTC (5:30 PM ET) — 90 minutes after US market close, Mon–Fri
+    - cron: '30 21 * * 1-5'
+    # Runs every Sunday at 02:00 UTC for weekly fundamentals refresh
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    # Allow manual trigger from the GitHub Actions UI
+    inputs:
+      run_fundamentals:
+        description: 'Also run fundamentals update (slow, ~20 min)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  update-prices:
+    name: Update Prices & Metrics (weekdays)
+    runs-on: ubuntu-latest
+    # Only run the price job on weekday schedule, not Sunday fundamentals schedule
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 21 * * 1-5'
+
+    env:
+      DB_HOST: ${{ secrets.RENDER_DB_HOST }}
+      DB_PORT: ${{ secrets.RENDER_DB_PORT }}
+      DB_NAME: ${{ secrets.RENDER_DB_NAME }}
+      DB_USER: ${{ secrets.RENDER_DB_USER }}
+      DB_PASSWORD: ${{ secrets.RENDER_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pipeline dependencies
+        run: |
+          pip install --upgrade pip
+          pip install yfinance psycopg2-binary pandas numpy python-dotenv scikit-learn scipy
+
+      - name: Ingest latest prices
+        run: python portfolio_app/ingest_yfinance_prices.py
+        timeout-minutes: 30
+
+      - name: Compute FF5 asset metrics
+        run: python portfolio_app/compute_asset_metrics_ff5.py
+        timeout-minutes: 20
+
+  update-fundamentals:
+    name: Update Fundamentals (weekly)
+    runs-on: ubuntu-latest
+    # Only run on Sunday schedule or manual trigger with flag set
+    if: |
+      github.event.schedule == '0 2 * * 0' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.run_fundamentals == 'true')
+
+    env:
+      DB_HOST: ${{ secrets.RENDER_DB_HOST }}
+      DB_PORT: ${{ secrets.RENDER_DB_PORT }}
+      DB_NAME: ${{ secrets.RENDER_DB_NAME }}
+      DB_USER: ${{ secrets.RENDER_DB_USER }}
+      DB_PASSWORD: ${{ secrets.RENDER_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pipeline dependencies
+        run: |
+          pip install --upgrade pip
+          pip install yfinance psycopg2-binary pandas numpy python-dotenv scikit-learn scipy
+
+      - name: Ingest fundamentals
+        run: python portfolio_app/ingest_complete_fundamentals.py
+        timeout-minutes: 40
+
+      - name: Ingest latest prices
+        run: python portfolio_app/ingest_yfinance_prices.py
+        timeout-minutes: 30
+
+      - name: Compute FF5 asset metrics
+        run: python portfolio_app/compute_asset_metrics_ff5.py
+        timeout-minutes: 20
