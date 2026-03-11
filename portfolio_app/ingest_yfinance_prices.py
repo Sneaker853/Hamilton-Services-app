@@ -1,6 +1,6 @@
 import yfinance as yf
 import psycopg2
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 import time
@@ -144,8 +144,20 @@ if __name__ == "__main__":
     
     print(f"Downloading prices for {len(ticker_map)} tickers...\n")
     
-    end_date = datetime.now().date()
+    end_date = datetime.now().date() + timedelta(days=1)
+    print(f"Using yfinance end date (exclusive): {end_date}")
     prices_data = download_prices(ticker_map, end_date)
+
+    latest_downloaded_date = None
+    for series in prices_data.values():
+        if not series:
+            continue
+        series_latest = max(item['date'] for item in series if item.get('date'))
+        if latest_downloaded_date is None or series_latest > latest_downloaded_date:
+            latest_downloaded_date = series_latest
+
+    if latest_downloaded_date:
+        print(f"Latest downloaded price date: {latest_downloaded_date}")
     
     if prices_data:
         print(f"\nInserting {len(prices_data)} assets into database...\n")
