@@ -40,16 +40,42 @@ TICKER_MAPPING = {
     'ATOM': 'ATOM-USD',
 }
 
-def download_prices(ticker_map, end_date):
+INITIAL_HISTORY_START = datetime(2021, 2, 8).date()
+OVERLAP_DAYS = 7
+
+def fetch_latest_price_dates():
+    """Get the latest stored price date per ticker."""
+    conn = psycopg2.connect(f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT ticker, MAX(date) AS latest_date
+        FROM price_history
+        GROUP BY ticker
+        """
+    )
+    latest_dates = {ticker: latest_date for ticker, latest_date in cur.fetchall()}
+    cur.close()
+    conn.close()
+    return latest_dates
+
+
+def download_prices(ticker_map, latest_dates, end_date):
     """Download historical price data from yfinance"""
     prices_data = {}
     
     for original_ticker, yf_ticker in list(ticker_map.items()):
         try:
-            print(f"Downloading {original_ticker}...", end="", flush=True)
+            latest_known_date = latest_dates.get(original_ticker)
+            if latest_known_date:
+                start_date = max(INITIAL_HISTORY_START, latest_known_date - timedelta(days=OVERLAP_DAYS))
+            else:
+                start_date = INITIAL_HISTORY_START
+
+            print(f"Downloading {original_ticker} from {start_date}...", end="", flush=True)
             
             ticker_obj = yf.Ticker(yf_ticker)
-            hist = ticker_obj.history(start='2021-02-08', end=end_date)
+            hist = ticker_obj.history(start=start_date.isoformat(), end=end_date)
             
             if hist.empty or len(hist) == 0:
                 print(f" SKIP - No data")
@@ -143,13 +169,20 @@ def insert_prices(prices_data):
         print(f"Inserting {ticker}...", end="", flush=True)
         
         try:
-            cur.execute("DELETE FROM price_history WHERE ticker = %s", (ticker,))
-            
             batch = [(p['ticker'], p['date'], p['open'], p['high'], p['low'], p['close'], p['volume']) 
                      for p in prices]
             
             cur.executemany(
-                "INSERT INTO price_history (ticker, date, open, high, low, close, volume) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                """
+                INSERT INTO price_history (ticker, date, open, high, low, close, volume)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (ticker, date) DO UPDATE SET
+                    open = EXCLUDED.open,
+                    high = EXCLUDED.high,
+                    low = EXCLUDED.low,
+                    close = EXCLUDED.close,
+                    volume = EXCLUDED.volume
+                """,
                 batch
             )
             conn.commit()
@@ -199,10 +232,12 @@ if __name__ == "__main__":
             ticker_map[ticker] = ticker
     
     print(f"Downloading prices for {len(ticker_map)} tickers...\n")
+    latest_dates = fetch_latest_price_dates()
+    print(f"Found existing price history for {len(latest_dates)} tickers")
     
     end_date = datetime.now().date() + timedelta(days=1)
     print(f"Using yfinance end date (exclusive): {end_date}")
-    prices_data = download_prices(ticker_map, end_date)
+    prices_data = download_prices(ticker_map, latest_dates, end_date)
 
     latest_downloaded_date = None
     for series in prices_data.values():
