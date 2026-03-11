@@ -57,7 +57,7 @@ jobs:
 
       - name: Ingest latest prices
         run: python portfolio_app/ingest_yfinance_prices.py
-        timeout-minutes: 30
+        timeout-minutes: 60
 
       - name: Validate latest price freshness
         run: |
@@ -132,7 +132,7 @@ jobs:
 
       - name: Ingest latest prices
         run: python portfolio_app/ingest_yfinance_prices.py
-        timeout-minutes: 30
+        timeout-minutes: 60
 
       - name: Validate latest price freshness
         run: |

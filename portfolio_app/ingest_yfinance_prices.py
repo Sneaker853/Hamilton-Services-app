@@ -87,7 +87,7 @@ def download_prices(ticker_map, end_date):
             else:
                 print(f" SKIP - No valid prices")
             
-            time.sleep(0.3)
+            time.sleep(0.05)
             
         except Exception as e:
             print(f" ERROR: {str(e)[:60]}")
