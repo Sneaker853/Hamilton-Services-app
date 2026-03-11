@@ -53,6 +53,34 @@ jobs:
         run: python portfolio_app/ingest_yfinance_prices.py
         timeout-minutes: 30
 
+      - name: Validate latest price freshness
+        run: |
+          python - << 'PY'
+          import os
+          from datetime import date
+          import psycopg2
+
+          conn = psycopg2.connect(
+              f"postgresql://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}@{os.environ['DB_HOST']}:{os.environ['DB_PORT']}/{os.environ['DB_NAME']}"
+          )
+          cur = conn.cursor()
+          cur.execute("SELECT MAX(date) FROM price_history")
+          latest = cur.fetchone()[0]
+          cur.close()
+          conn.close()
+
+          if latest is None:
+              raise SystemExit("No rows found in price_history after update.")
+
+          lag_days = (date.today() - latest).days
+          print(f"Latest price date: {latest} (lag: {lag_days} day(s))")
+
+          if lag_days > 4:
+              raise SystemExit(
+                  f"Price data is stale by {lag_days} days (latest={latest}). Failing workflow."
+              )
+          PY
+
       - name: Compute FF5 asset metrics
         run: python portfolio_app/compute_asset_metrics_ff5.py
         timeout-minutes: 20
@@ -93,6 +121,34 @@ jobs:
       - name: Ingest latest prices
         run: python portfolio_app/ingest_yfinance_prices.py
         timeout-minutes: 30
+
+      - name: Validate latest price freshness
+        run: |
+          python - << 'PY'
+          import os
+          from datetime import date
+          import psycopg2
+
+          conn = psycopg2.connect(
+              f"postgresql://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}@{os.environ['DB_HOST']}:{os.environ['DB_PORT']}/{os.environ['DB_NAME']}"
+          )
+          cur = conn.cursor()
+          cur.execute("SELECT MAX(date) FROM price_history")
+          latest = cur.fetchone()[0]
+          cur.close()
+          conn.close()
+
+          if latest is None:
+              raise SystemExit("No rows found in price_history after update.")
+
+          lag_days = (date.today() - latest).days
+          print(f"Latest price date: {latest} (lag: {lag_days} day(s))")
+
+          if lag_days > 4:
+              raise SystemExit(
+                  f"Price data is stale by {lag_days} days (latest={latest}). Failing workflow."
+              )
+          PY
 
       - name: Compute FF5 asset metrics
         run: python portfolio_app/compute_asset_metrics_ff5.py
