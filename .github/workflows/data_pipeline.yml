@@ -49,6 +49,12 @@ jobs:
           pip install --upgrade pip
           pip install yfinance psycopg2-binary pandas numpy python-dotenv scikit-learn scipy
 
+      - name: Show pipeline revision markers
+        run: |
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          echo "Checking ingestion script markers..."
+          grep -n "LATEST_DOWNLOADED_PRICE_DATE\|LATEST_DB_PRICE_DATE\|ensure_price_history_id_default" portfolio_app/ingest_yfinance_prices.py || true
+
       - name: Ingest latest prices
         run: python portfolio_app/ingest_yfinance_prices.py
         timeout-minutes: 30
@@ -113,6 +119,12 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install yfinance psycopg2-binary pandas numpy python-dotenv scikit-learn scipy
+
+      - name: Show pipeline revision markers
+        run: |
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          echo "Checking ingestion script markers..."
+          grep -n "LATEST_DOWNLOADED_PRICE_DATE\|LATEST_DB_PRICE_DATE\|ensure_price_history_id_default" portfolio_app/ingest_yfinance_prices.py || true
 
       - name: Ingest fundamentals
         run: python portfolio_app/ingest_complete_fundamentals.py
