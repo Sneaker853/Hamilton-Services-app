@@ -19,11 +19,17 @@ const MarketData = ({ apiBase }) => {
   const [selectedExchange, setSelectedExchange] = useState('');
   const [sectors, setSectors] = useState([]);
   const [exchanges, setExchanges] = useState([]);
+  const [latestPriceDate, setLatestPriceDate] = useState(null);
+  const [latestPriceTickerCount, setLatestPriceTickerCount] = useState(0);
+  const [tickersWithPrice, setTickersWithPrice] = useState(0);
 
   const fetchAllStocks = useCallback(async () => {
     try {
       const response = await axios.get(`${apiBase}/stocks/all`);
       setStocks(response.data.stocks || []);
+      setLatestPriceDate(response.data.latest_price_date || null);
+      setLatestPriceTickerCount(response.data.latest_price_ticker_count || 0);
+      setTickersWithPrice(response.data.tickers_with_price || 0);
     } catch (fetchError) {
       console.error('Error fetching stocks:', fetchError);
       setError('Unable to load market data. Please try again.');
@@ -109,6 +115,62 @@ const MarketData = ({ apiBase }) => {
     return { change, percent };
   }, [priceHistory]);
 
+  const priceDomain = useMemo(() => {
+    const closes = priceHistory
+      .map((point) => Number(point.close))
+      .filter((value) => Number.isFinite(value));
+
+    if (closes.length === 0) {
+      return ['auto', 'auto'];
+    }
+
+    const min = Math.min(...closes);
+    const max = Math.max(...closes);
+
+    if (min === max) {
+      const flatPadding = Math.max(min * 0.02, 1);
+      return [Math.max(0, min - flatPadding), max + flatPadding];
+    }
+
+    const paddingByPeriod = {
+      '1W': 0.16,
+      '1M': 0.12,
+      '3M': 0.1,
+      '6M': 0.08,
+      '1Y': 0.06,
+      '5Y': 0.05,
+      MAX: 0.04,
+    };
+
+    const range = max - min;
+    const padding = range * (paddingByPeriod[selectedPeriod] ?? 0.08);
+    const lower = Math.max(0, min - padding);
+    const upper = max + padding;
+
+    return [Number(lower.toFixed(2)), Number(upper.toFixed(2))];
+  }, [priceHistory, selectedPeriod]);
+
+  const formatAxisPrice = useCallback((value) => {
+    if (!Number.isFinite(value)) return value;
+    if (Math.abs(value) >= 1000) {
+      return `$${value.toLocaleString([], { maximumFractionDigits: 0 })}`;
+    }
+    if (Math.abs(value) >= 100) {
+      return `$${value.toFixed(0)}`;
+    }
+    if (Math.abs(value) >= 10) {
+      return `$${value.toFixed(1)}`;
+    }
+    return `$${value.toFixed(2)}`;
+  }, []);
+
+  const latestPriceDateLabel = useMemo(() => {
+    if (!latestPriceDate) return null;
+    const value = new Date(latestPriceDate);
+    if (Number.isNaN(value.getTime())) return null;
+    return value.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+  }, [latestPriceDate]);
+
   return (
     <div className="market-root">
       <div className="market-header">
@@ -117,6 +179,12 @@ const MarketData = ({ apiBase }) => {
           <div>
             <h2>Market Data</h2>
             <p>Explore stocks, fundamentals, and historical price action.</p>
+            {latestPriceDateLabel && (
+              <p>
+                Price data as of {latestPriceDateLabel}
+                {tickersWithPrice > 0 && ` (${latestPriceTickerCount}/${tickersWithPrice} tickers at latest date)`}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -249,7 +317,8 @@ const MarketData = ({ apiBase }) => {
                         />
                         <YAxis
                           tick={{ fill: '#64748b', fontSize: 11 }}
-                          tickFormatter={(value) => `$${value.toFixed(0)}`}
+                          domain={priceDomain}
+                          tickFormatter={formatAxisPrice}
                           axisLine={false}
                           tickLine={false}
                         />
