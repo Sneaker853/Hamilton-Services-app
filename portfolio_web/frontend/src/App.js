@@ -9,8 +9,10 @@ import {
   FiBriefcase,
   FiGrid,
   FiInfo,
+  FiLock,
   FiLogIn,
   FiLogOut,
+  FiMail,
   FiMenu,
   FiSettings,
   FiShield,
@@ -28,6 +30,8 @@ import MarketData from './pages/MarketData';
 import AdminPanel from './pages/AdminPanel';
 import Login from './pages/Login';
 import Mission from './pages/Mission';
+import Contact from './pages/Contact';
+import ChangePassword from './pages/ChangePassword';
 
 // API base URL strategy:
 // - Production: explicit REACT_APP_API_URL (or same-origin /api reverse proxy)
@@ -195,6 +199,8 @@ function AppContent() {
     { path: '/portfolio-builder', label: 'Builder', icon: FiBriefcase },
     { path: '/market-data', label: 'Market Data', icon: FiBarChart2 },
     { path: '/mission', label: 'Mission', icon: FiInfo },
+    { path: '/contact', label: 'Contact', icon: FiMail },
+    { path: '/change-password', label: 'Password', icon: FiLock, requiresAuth: true },
     { path: '/admin', label: 'Admin', icon: FiShield },
   ];
 
@@ -204,7 +210,10 @@ function AppContent() {
   }, [authUser]);
 
   if (!authUser && !guestMode) {
-    return <Login apiBase={API_BASE} fullScreen />;
+    return <Login apiBase={API_BASE} fullScreen onGuestContinue={() => {
+      localStorage.setItem('guestMode', 'true');
+      setGuestMode(true);
+    }} />;
   }
 
   const canAccessAdmin = String(authUser?.email || '').trim().toLowerCase() === ADMIN_ALLOWED_EMAIL;
@@ -213,6 +222,7 @@ function AppContent() {
     <nav className="shell-nav-links">
       {menuItems
         .filter((item) => item.path !== '/admin' || canAccessAdmin)
+        .filter((item) => !item.requiresAuth || authUser)
         .map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -346,6 +356,8 @@ function AppContent() {
           <Route path="/portfolio-builder" element={<PortfolioBuilder apiBase={API_BASE} />} />
           <Route path="/market-data" element={<MarketData apiBase={API_BASE} />} />
           <Route path="/mission" element={<Mission />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/change-password" element={authUser ? <ChangePassword apiBase={API_BASE} /> : <Navigate to="/login" replace />} />
           <Route path="/admin" element={canAccessAdmin ? <AdminPanel apiBase={API_BASE} /> : <Navigate to="/" replace />} />
           <Route path="/login" element={<Login apiBase={API_BASE} />} />
         </Routes>

@@ -353,4 +353,16 @@
   .market-metrics-grid {
     grid-template-columns: 1fr;
   }
+
+  .market-chart-wrap {
+    height: 260px;
+  }
+
+  .market-price-area strong {
+    font-size: 22px;
+  }
+
+  .market-period-controls {
+    flex-wrap: wrap;
+  }
 }

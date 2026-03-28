@@ -14,6 +14,7 @@ from schemas import (
     MessageResponse,
     PasswordResetRequest,
     PasswordResetConfirmRequest,
+    ChangePasswordRequest,
     VerifyEmailConfirmRequest,
 )
 from security import (
@@ -348,6 +349,43 @@ async def confirm_password_reset(request: PasswordResetConfirmRequest):
     revoke_user_sessions(user_id)
 
     return {"success": True, "message": "Password reset successfully."}
+
+
+@router.post("/change-password", response_model=MessageResponse)
+async def change_password(
+    request: ChangePasswordRequest,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    token = resolve_auth_token(x_auth_token, session_cookie)
+    user = get_user_from_token(token)
+
+    with get_cursor(dict_cursor=True) as (_, cur):
+        cur.execute(
+            "SELECT password_hash, password_salt FROM app_users WHERE id = %s",
+            (user["id"],),
+        )
+        row = cur.fetchone()
+
+    if not row or not verify_password(request.current_password, row["password_hash"], row["password_salt"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    _validate_password_strength(request.new_password)
+
+    password_data = hash_password(request.new_password)
+    with get_cursor() as (conn, cur):
+        cur.execute(
+            """
+            UPDATE app_users
+            SET password_hash = %s,
+                password_salt = %s
+            WHERE id = %s
+            """,
+            (password_data["hash"], password_data["salt"], user["id"]),
+        )
+        conn.commit()
+
+    return {"success": True, "message": "Password changed successfully."}
 
 
 @router.get("/me")

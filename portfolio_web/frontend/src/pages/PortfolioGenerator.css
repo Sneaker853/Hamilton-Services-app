@@ -391,4 +391,13 @@
   .portfolio-generator-root .metrics-grid {
     grid-template-columns: 1fr;
   }
+
+  .portfolio-generator-root .holdings-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .portfolio-generator-root .holdings-table-wrapper table {
+    min-width: 540px;
+  }
 }

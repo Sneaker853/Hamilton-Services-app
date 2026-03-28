@@ -899,6 +899,42 @@
   margin-bottom: 12px;
 }
 
+@media (max-width: 700px) {
+  .portfolio-builder-root .pb-step-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .portfolio-builder-root .pb-results-actions {
+    flex-direction: column;
+  }
+
+  .portfolio-builder-root .pb-name-input {
+    width: 100%;
+  }
+
+  .portfolio-builder-root .holdings-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .portfolio-builder-root .holdings-table table {
+    min-width: 540px;
+  }
+
+  .portfolio-builder-root .portfolio-metrics .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-builder-root .pb-analytics-tabs {
+    gap: 6px;
+  }
+
+  .portfolio-builder-root .pb-analytics-actions {
+    flex-wrap: wrap;
+  }
+}
+
 .portfolio-builder-root .pb-analytics-run-btn {
   padding: 6px 20px;
   border: 1px solid rgba(34, 211, 238, 0.5);

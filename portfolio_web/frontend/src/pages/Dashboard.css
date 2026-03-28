@@ -391,6 +391,29 @@
   }
 
   .dashboard-title {
-    font-size: 24px;
+    font-size: 22px;
+  }
+
+  .dashboard-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dashboard-table {
+    min-width: 480px;
+  }
+
+  .dashboard-chart-wrap {
+    height: 220px;
+  }
+
+  .dashboard-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .dashboard-performance-card {
+    padding: 12px;
   }
 }

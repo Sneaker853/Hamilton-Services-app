@@ -131,6 +131,11 @@ class PasswordResetConfirmRequest(BaseModel):
     new_password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class VerifyEmailConfirmRequest(BaseModel):
     token: str
 
