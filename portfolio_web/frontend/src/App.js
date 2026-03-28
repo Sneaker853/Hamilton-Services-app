@@ -210,10 +210,9 @@ function AppContent() {
   }, [authUser]);
 
   if (!authUser && !guestMode) {
-    return <Login apiBase={API_BASE} fullScreen onGuestContinue={() => {
-      localStorage.setItem('guestMode', 'true');
-      setGuestMode(true);
-    }} />;
+    // Auto-enable guest mode so the dashboard is the landing page
+    localStorage.setItem('guestMode', 'true');
+    setGuestMode(true);
   }
 
   const canAccessAdmin = String(authUser?.email || '').trim().toLowerCase() === ADMIN_ALLOWED_EMAIL;
