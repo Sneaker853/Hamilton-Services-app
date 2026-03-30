@@ -296,6 +296,7 @@ const PortfolioGenerator = ({ apiBase }) => {
               {personasLoading ? (
                 <LoadingSkeleton height="44px" borderRadius="8px" />
               ) : (
+                <>
                 <select 
                   name="persona_name" 
                   value={formData.persona_name}
@@ -311,6 +312,7 @@ const PortfolioGenerator = ({ apiBase }) => {
                 {PERSONA_DESCRIPTIONS[formData.persona_name] && (
                   <p className="pg-persona-desc">{PERSONA_DESCRIPTIONS[formData.persona_name]}</p>
                 )}
+                </>
               )}
             </div>
 
