@@ -383,7 +383,9 @@ const Dashboard = ({ apiBase }) => {
               <tbody>
                 {topHoldings.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="dashboard-empty-cell">No holdings yet.</td>
+                    <td colSpan={4} className="dashboard-empty-cell">
+                      No holdings yet. <Link to="/portfolio" className="dashboard-inline-link">Generate a portfolio</Link> to get started.
+                    </td>
                   </tr>
                 )}
                 {topHoldings.map((holding) => (
@@ -392,7 +394,7 @@ const Dashboard = ({ apiBase }) => {
                     <td>{holding.allocationPct.toFixed(1)}%</td>
                     <td>{formatCurrency(holding.value)}</td>
                     <td className={holding.expectedReturnPct >= 0 ? 'positive' : 'negative'}>
-                      {formatPercent(holding.expectedReturnPct, 1)}
+                      {holding.expectedReturnPct >= 0 ? '▲ ' : '▼ '}{formatPercent(holding.expectedReturnPct, 1)}
                     </td>
                   </tr>
                 ))}
@@ -411,7 +413,7 @@ const Dashboard = ({ apiBase }) => {
           <div className="dashboard-activity-list">
             {savedLoading && <p className="dashboard-muted">Loading activity…</p>}
             {!savedLoading && recentPortfolios.length === 0 && (
-              <p className="dashboard-muted">No recent activity. Start by creating a portfolio.</p>
+              <p className="dashboard-muted">No recent activity. <Link to="/portfolio" className="dashboard-inline-link">Create your first portfolio</Link> to start tracking.</p>
             )}
             {!savedLoading && recentPortfolios.map((item) => (
               <button key={item.id} type="button" className="dashboard-activity-item" onClick={() => openInBuilder(item)}>
@@ -459,7 +461,7 @@ const Dashboard = ({ apiBase }) => {
               <div>
                 <p>Expected Return</p>
                 <strong className={item.expectedReturnPct >= 0 ? 'positive' : 'negative'}>
-                  {formatPercent(item.expectedReturnPct, 1)}
+                  {item.expectedReturnPct >= 0 ? '▲ ' : '▼ '}{formatPercent(item.expectedReturnPct, 1)}
                 </strong>
               </div>
             </button>

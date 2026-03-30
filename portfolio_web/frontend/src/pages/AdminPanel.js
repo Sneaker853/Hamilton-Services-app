@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { FiActivity, FiAlertTriangle, FiBarChart2, FiDatabase, FiRefreshCw, FiShield } from 'react-icons/fi';
+import { ConfirmModal } from '../components';
 import './AdminPanel.css';
 
 const AdminPanel = ({ apiBase }) => {
@@ -9,6 +10,12 @@ const AdminPanel = ({ apiBase }) => {
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : 'Never');
+  const formatDateOnly = (value) => (value ? new Date(value).toLocaleDateString([], {
+    month: 'long', day: 'numeric', year: 'numeric',
+  }) : 'Unknown');
 
   const fetchUpdateStatus = useCallback(async () => {
     try {
@@ -27,14 +34,13 @@ const AdminPanel = ({ apiBase }) => {
     return () => clearInterval(interval);
   }, [fetchUpdateStatus]);
 
-  const handleUpdateClick = async () => {
+  const handleUpdateClick = () => {
     if (updating) return;
+    setConfirmOpen(true);
+  };
 
-    const confirmed = window.confirm(
-      'This will update stock fundamentals from Yahoo Finance.\nThis process takes 15-20 minutes.\nContinue?'
-    );
-    if (!confirmed) return;
-
+  const handleConfirmUpdate = async () => {
+    setConfirmOpen(false);
     setUpdating(true);
     setMessage('');
 
@@ -78,6 +84,11 @@ const AdminPanel = ({ apiBase }) => {
         <div className={`admin-message ${messageType}`}>
           {messageType === 'error' ? <FiAlertTriangle /> : <FiActivity />}
           <span>{message}</span>
+          {messageType === 'error' && (
+            <button type="button" className="admin-retry-btn" onClick={() => { setMessage(''); fetchUpdateStatus(); }}>
+              Retry
+            </button>
+          )}
         </div>
       )}
 
@@ -103,7 +114,14 @@ const AdminPanel = ({ apiBase }) => {
             Refreshes revenue, net income, operating margin, current ratio, and market cap from Yahoo Finance.
           </p>
           <div className="admin-stat-list">
-            <div><span>Last Updated</span><strong>{status?.last_updated ? new Date(status.last_updated).toLocaleString() : 'Never'}</strong></div>
+            <div><span>Fundamentals Updated</span><strong>{formatDateTime(status?.last_updated)}</strong></div>
+            <div>
+              <span>Latest Price Date</span>
+              <strong>
+                {formatDateOnly(status?.latest_price_date)}
+                {status?.tickers_with_price > 0 && ` (${status?.latest_price_ticker_count || 0}/${status?.tickers_with_price} tickers)`}
+              </strong>
+            </div>
             <div><span>Estimated Duration</span><strong>15-20 minutes</strong></div>
           </div>
           <button type="button" className="admin-update-btn" onClick={handleUpdateClick} disabled={updating}>
@@ -123,6 +141,16 @@ const AdminPanel = ({ apiBase }) => {
           </ul>
         </section>
       </div>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Update Stock Data"
+        message="This will update stock fundamentals from Yahoo Finance.\nThis process takes 15-20 minutes.\nContinue?"
+        confirmLabel="Start Update"
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmUpdate}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 };

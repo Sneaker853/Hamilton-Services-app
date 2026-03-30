@@ -72,6 +72,22 @@
   color: #ef4444;
 }
 
+.admin-retry-btn {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.admin-retry-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 .admin-kpi-grid {
   display: grid;
   gap: 10px;

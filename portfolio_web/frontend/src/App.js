@@ -242,6 +242,7 @@ function AppContent() {
 
   return (
     <div className="shell-app">
+      <a href="#main-content" className="skip-to-main">Skip to main content</a>
       <button
         className="shell-mobile-toggle"
         onClick={() => setMobileNavOpen(true)}
@@ -333,7 +334,7 @@ function AppContent() {
         <NavLinks onNavigate={() => setMobileNavOpen(false)} />
       </aside>
 
-      <main className={`shell-main ${sidebarCollapsed ? 'collapsed' : ''}`}>
+      <main id="main-content" className={`shell-main ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <header className="shell-topbar">
           <div>
             <h1>{menuItems.find((item) => item.path === location.pathname)?.label || 'Hamilton Services'}</h1>

@@ -28,6 +28,7 @@ from schemas import (
     StressTestRequest,
     RiskDecompositionRequest,
     DriftMonitorRequest,
+    AnalyzePortfolioRequest,
 )
 from security import get_user_from_token, resolve_auth_token
 from services import get_config_manager, get_portfolio_builder
@@ -250,39 +251,44 @@ async def generate_portfolio(request: PortfolioRequest):
 
 
 @router.post("/api/portfolio/analyze")
-async def analyze_portfolio(holdings: List[Dict]):
+async def analyze_portfolio(request: AnalyzePortfolioRequest):
     try:
+        holdings = request.holdings
         if not holdings:
             raise HTTPException(status_code=400, detail="Portfolio is empty")
 
-        tickers = [holding["ticker"] for holding in holdings]
-        placeholders = ",".join(["%s"] * len(tickers))
+        tickers = [h.ticker for h in holdings]
 
         with get_cursor(dict_cursor=True) as (_, cur):
             cur.execute(
-                f"""
+                """
                 SELECT ticker, beta, pe_ratio, roe, sector
                 FROM stocks
-                WHERE ticker IN ({placeholders})
+                WHERE ticker = ANY(%s)
                 """,
-                tickers,
+                (tickers,),
             )
             fundamentals = {row["ticker"]: row for row in cur.fetchall()}
 
-        total_value = sum(holding.get("value", 0) for holding in holdings)
+        total_value = sum(h.value for h in holdings)
+
+        sector_breakdown = {}
+        for h in holdings:
+            sector = fundamentals.get(h.ticker, {}).get("sector") or "Unknown"
+            sector_breakdown[sector] = sector_breakdown.get(sector, 0) + h.weight
 
         analysis = {
             "total_holdings": len(holdings),
             "total_value": total_value,
-            "concentration": max(holding.get("weight", 0) for holding in holdings) if holdings else 0,
-            "sector_breakdown": {},
+            "concentration": max(h.weight for h in holdings) if holdings else 0,
+            "sector_breakdown": sector_breakdown,
             "risk_metrics": {
-                "avg_beta": sum(fundamentals.get(holding["ticker"], {}).get("beta", 0) or 0 for holding in holdings) / len(holdings) if holdings else 0,
-                "portfolio_beta": sum((holding.get("weight", 0) * (fundamentals.get(holding["ticker"], {}).get("beta", 0) or 0)) for holding in holdings),
+                "avg_beta": sum(fundamentals.get(h.ticker, {}).get("beta", 0) or 0 for h in holdings) / len(holdings) if holdings else 0,
+                "portfolio_beta": sum((h.weight * (fundamentals.get(h.ticker, {}).get("beta", 0) or 0)) for h in holdings),
             },
             "performance_metrics": {
-                "avg_pe": sum((fundamentals.get(holding["ticker"], {}).get("pe_ratio", 0) or 0) for holding in holdings) / len(holdings) if holdings else 0,
-                "avg_roe": sum((fundamentals.get(holding["ticker"], {}).get("roe", 0) or 0) for holding in holdings) / len(holdings) if holdings else 0,
+                "avg_pe": sum((fundamentals.get(h.ticker, {}).get("pe_ratio", 0) or 0) for h in holdings) / len(holdings) if holdings else 0,
+                "avg_roe": sum((fundamentals.get(h.ticker, {}).get("roe", 0) or 0) for h in holdings) / len(holdings) if holdings else 0,
             },
         }
 
@@ -299,6 +305,9 @@ async def optimize_weights(request: OptimizeWeightsRequest):
     try:
         if not request.tickers:
             raise HTTPException(status_code=400, detail="No tickers provided")
+
+        if len(request.tickers) > 100:
+            raise HTTPException(status_code=400, detail="Maximum 100 tickers allowed per optimization request")
 
         if not request.optimize_sharpe:
             equal_weight = 100.0 / len(request.tickers)
@@ -400,6 +409,14 @@ async def optimize_weights(request: OptimizeWeightsRequest):
         # ---- Target return constraint ----
         if objective_name == "target_return" and request.target_return is not None:
             target_ret = float(request.target_return)
+            # Feasibility check: target cannot exceed max individual asset return
+            max_achievable = float(np.max(mean_returns))
+            if target_ret > max_achievable:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Target return {target_ret:.4f} exceeds maximum achievable return {max_achievable:.4f}. "
+                           f"Reduce target or add higher-return assets.",
+                )
             constraints.append(
                 {"type": "ineq", "fun": lambda w, tr=target_ret: portfolio_return(w) - tr}
             )
@@ -415,15 +432,24 @@ async def optimize_weights(request: OptimizeWeightsRequest):
 
         benchmark_sector_weights = _normalize_weight_map(request.benchmark_sector_weights)
         if request.max_sector_active_weight is not None and not benchmark_sector_weights:
-            if prev_total > 0:
-                for idx, ticker in enumerate(aligned_tickers):
-                    sector = ticker_to_sector.get(ticker, "Unknown")
-                    benchmark_sector_weights[sector] = benchmark_sector_weights.get(sector, 0.0) + float(previous_weights_vec[idx])
-            else:
-                equal_weight = 1.0 / len(aligned_tickers)
-                for ticker in aligned_tickers:
-                    sector = ticker_to_sector.get(ticker, "Unknown")
-                    benchmark_sector_weights[sector] = benchmark_sector_weights.get(sector, 0.0) + equal_weight
+            # Use approximate S&P 500 sector weights as default benchmark
+            # instead of equal-weight, reflecting actual market structure.
+            _sp500_sector_weights = {
+                "Technology": 0.30, "Healthcare": 0.13, "Financials": 0.13,
+                "Consumer Discretionary": 0.10, "Communication Services": 0.09,
+                "Industrials": 0.08, "Consumer Staples": 0.06, "Energy": 0.04,
+                "Utilities": 0.03, "Real Estate": 0.02, "Materials": 0.02,
+            }
+            # Map portfolio sectors to benchmark weights; unknown sectors
+            # get a small residual allocation so constraints remain feasible.
+            portfolio_sectors = {ticker_to_sector.get(t, "Unknown") for t in aligned_tickers}
+            matched_total = sum(_sp500_sector_weights.get(s, 0.0) for s in portfolio_sectors)
+            for sector in portfolio_sectors:
+                if sector in _sp500_sector_weights:
+                    # Re-normalise to the subset of sectors present
+                    benchmark_sector_weights[sector] = _sp500_sector_weights[sector] / matched_total if matched_total > 0 else 1.0 / len(portfolio_sectors)
+                else:
+                    benchmark_sector_weights[sector] = 0.02  # small residual
         if request.max_sector_active_weight is not None:
             max_sector_active_weight = float(request.max_sector_active_weight)
             sectors = sorted({ticker_to_sector.get(ticker, "Unknown") for ticker in aligned_tickers})
@@ -453,8 +479,9 @@ async def optimize_weights(request: OptimizeWeightsRequest):
                 )
 
         bounds = tuple((0.0, 1.0) for _ in range(len(aligned_tickers)))
-        initial_weights = np.array([1.0 / len(aligned_tickers)] * len(aligned_tickers))
 
+        # Warm-start: use previous weights if available, else equal-weight
+        initial_weights = np.array([1.0 / len(aligned_tickers)] * len(aligned_tickers))
         if prev_total > 0:
             initial_weights = previous_weights_vec.copy()
 
@@ -468,6 +495,23 @@ async def optimize_weights(request: OptimizeWeightsRequest):
         )
 
         if not result_opt.success:
+            # Infeasibility detection: distinguish contradictory constraints
+            # from convergence issues
+            msg = str(result_opt.message)
+            is_infeasible = any(kw in msg.lower() for kw in [
+                "positive directional derivative",
+                "inequality constraints incompatible",
+                "singular matrix",
+            ])
+            if is_infeasible:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Optimization infeasible: constraints are contradictory. "
+                           f"Relax max_sector_active_weight, max_turnover, or target_return. "
+                           f"Solver message: {msg}",
+                )
+
+            # Non-infeasible failure — fall back to equal weight with warning
             equal_weight = 100.0 / len(request.tickers)
             result = [{"ticker": ticker, "weight": round(equal_weight, 2)} for ticker in request.tickers]
             return {
@@ -476,7 +520,7 @@ async def optimize_weights(request: OptimizeWeightsRequest):
                 "optimized": False,
                 "warning": {
                     "code": "OPTIMIZATION_FAILED",
-                    "reason": str(result_opt.message),
+                    "reason": msg,
                     "fallback_method": "equal_weight",
                 },
             }
@@ -1024,44 +1068,120 @@ async def portfolio_backtest(req: BacktestRequest):
         n_days = price_mat.shape[0]
         n_assets = price_mat.shape[1]
 
-        # Determine rebalance schedule
+        def _walk_forward_weights(price_history_slice: np.ndarray, current_tw: np.ndarray) -> np.ndarray:
+            """Re-estimate minimum-variance weights using only past data.
+
+            Uses a simplified approach: re-compute covariance from the
+            available history slice and find the min-vol portfolio
+            (constrained to be close to target weights).
+            Falls back to current target weights if insufficient data.
+            """
+            if price_history_slice.shape[0] < 60:
+                return current_tw
+            try:
+                rets = np.diff(price_history_slice, axis=0) / price_history_slice[:-1]
+                # Forward-fill any NaN in returns
+                rets = np.nan_to_num(rets, nan=0.0)
+                cov_method = _get_covariance_method()
+                if cov_method == "ledoit_wolf":
+                    cov = LedoitWolf().fit(rets).covariance_ * 252
+                elif cov_method == "oas":
+                    cov = OAS().fit(rets).covariance_ * 252
+                else:
+                    cov = np.cov(rets, rowvar=False) * 252
+
+                n = cov.shape[0]
+                # Minimum variance with shrinkage toward target
+                inv_cov = np.linalg.inv(cov + np.eye(n) * 1e-6)
+                ones = np.ones(n)
+                mv_weights = inv_cov @ ones / (ones @ inv_cov @ ones)
+                mv_weights = np.clip(mv_weights, 0.0, None)
+                mv_weights = mv_weights / mv_weights.sum()
+                # Blend: 70% target + 30% min-variance (walk-forward adjustment)
+                blended = 0.7 * current_tw + 0.3 * mv_weights
+                blended = np.clip(blended, 0.0, None)
+                blended = blended / blended.sum()
+                return blended
+            except Exception:
+                return current_tw
+
+        # Determine rebalance schedule using actual business dates
         freq = req.rebalance_frequency.lower()
-        rebal_interval = {
-            "daily": 1, "weekly": 5, "monthly": 21, "quarterly": 63, "none": n_days + 1,
-        }.get(freq, 21)
+
+        # Build set of rebalance dates from actual business calendar
+        all_dates = prices.index.tolist()
+        date_index = pd.DatetimeIndex(all_dates)
+        if freq == "none":
+            rebal_dates = set()
+        elif freq == "daily":
+            rebal_dates = set(all_dates)
+        elif freq == "weekly":
+            # Last trading day of each week
+            week_groups = date_index.to_series().groupby(date_index.isocalendar().week).last()
+            rebal_dates = set(week_groups.values)
+        elif freq == "quarterly":
+            # Last trading day of each quarter
+            qtr_groups = date_index.to_series().groupby(date_index.to_period("Q")).last()
+            rebal_dates = set(qtr_groups.values)
+        else:  # monthly (default)
+            # Last trading day of each month — proper BMonthEnd
+            month_groups = date_index.to_series().groupby(date_index.to_period("M")).last()
+            rebal_dates = set(month_groups.values)
 
         # Walk-forward simulation
         portfolio_value = req.initial_value
         shares = tw * portfolio_value / price_mat[0]  # initial share count per asset
         rebalance_log = []
         cost_rate = req.cost_bps / 10_000  # convert bps to decimal
+
+        # Simplified Almgren-Chriss market impact: impact ≈ k * σ * sqrt(trade_fraction)
+        # where k is a market impact coefficient and trade_fraction is the
+        # fraction of portfolio being traded.  This penalises large rebalances
+        # more than proportionally, reflecting real market microstructure.
+        market_impact_k = 0.1  # impact coefficient (conservative)
+
+        # Pre-compute per-asset trailing volatility for impact estimation
+        asset_daily_rets = np.diff(price_mat, axis=0) / price_mat[:-1]
+        asset_trailing_vol = np.std(asset_daily_rets[-min(60, asset_daily_rets.shape[0]):], axis=0, ddof=1) if asset_daily_rets.shape[0] > 1 else np.full(n_assets, 0.01)
+
         total_cost = 0.0
 
         dates = prices.index.tolist()
         series = [{"date": dates[0].isoformat() if hasattr(dates[0], "isoformat") else str(dates[0]),
                     "value": round(portfolio_value, 2)}]
 
-        days_since_rebal = 0
         for day in range(1, n_days):
             # Mark-to-market
             portfolio_value = float(np.sum(shares * price_mat[day]))
-            days_since_rebal += 1
 
-            # Should we rebalance?
-            if days_since_rebal >= rebal_interval and day < n_days - 1:
-                # Rebalance: redistribute to target weights
-                new_shares = tw * portfolio_value / price_mat[day]
-                trade_value = float(np.sum(np.abs(new_shares * price_mat[day] - shares * price_mat[day])))
+            # Should we rebalance? Check if this date is a rebalance date
+            current_date = dates[day]
+            # Convert to Timestamp for comparison if needed
+            current_ts = pd.Timestamp(current_date)
+            if current_ts in rebal_dates and day < n_days - 1:
+                # Walk-forward: re-estimate weights using only data up to this point
+                rebal_tw = _walk_forward_weights(price_mat[:day + 1], tw)
+
+                # Rebalance: redistribute to re-estimated target weights
+                new_shares = rebal_tw * portfolio_value / price_mat[day]
+                trade_notional = np.abs(new_shares * price_mat[day] - shares * price_mat[day])
+                trade_value = float(np.sum(trade_notional))
                 turnover = trade_value / portfolio_value
 
-                # Deduct transaction costs (applied to traded notional)
-                rebal_cost = trade_value * cost_rate
+                # Flat transaction cost
+                flat_cost = trade_value * cost_rate
+
+                # Market impact: k * σ_i * sqrt(trade_fraction_i) per asset
+                trade_fractions = trade_notional / max(portfolio_value, 1.0)
+                impact_per_asset = market_impact_k * asset_trailing_vol * np.sqrt(trade_fractions) * (trade_notional)
+                market_impact_cost = float(np.sum(impact_per_asset))
+
+                rebal_cost = flat_cost + market_impact_cost
                 total_cost += rebal_cost
                 portfolio_value -= rebal_cost
 
                 # Recalculate shares after cost deduction
-                shares = tw * portfolio_value / price_mat[day]
-                days_since_rebal = 0
+                shares = rebal_tw * portfolio_value / price_mat[day]
 
                 date_str = dates[day].isoformat() if hasattr(dates[day], "isoformat") else str(dates[day])
                 rebalance_log.append({
@@ -1410,4 +1530,171 @@ async def drift_monitor(req: DriftMonitorRequest):
         raise
     except Exception:
         logger.exception("Error computing drift monitor")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Portfolio-level FF5 factor attribution
+# ---------------------------------------------------------------------------
+
+@router.post("/api/portfolio/factor-attribution")
+async def factor_attribution(req: RiskDecompositionRequest):
+    """
+    Aggregate individual stock FF5 betas into portfolio-level factor
+    exposures.  Returns weighted beta to each Fama-French factor,
+    the portfolio alpha, and per-asset factor detail.
+    """
+    try:
+        tickers = [h.ticker.upper() for h in req.holdings]
+        weights_raw = np.array([h.weight for h in req.holdings], dtype=float)
+        w_sum = weights_raw.sum()
+        if w_sum <= 0:
+            raise HTTPException(status_code=400, detail="Weights must sum to a positive number")
+        weights = weights_raw / w_sum
+
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                """
+                SELECT ticker, beta_mkt, beta_smb, beta_hml, beta_rmw, beta_cma,
+                       alpha, r2, expected_return, volatility
+                FROM asset_metrics
+                WHERE ticker = ANY(%s)
+                """,
+                (tickers,),
+            )
+            rows = cur.fetchall()
+
+        metric_map = {r["ticker"]: r for r in rows}
+
+        factor_names = ["Mkt-RF", "SMB", "HML", "RMW", "CMA"]
+        beta_keys = ["beta_mkt", "beta_smb", "beta_hml", "beta_rmw", "beta_cma"]
+
+        # Per-asset detail
+        asset_detail = []
+        portfolio_betas = np.zeros(5)
+        portfolio_alpha = 0.0
+
+        for i, t in enumerate(tickers):
+            m = metric_map.get(t, {})
+            betas = [float(m.get(k) or 0.0) for k in beta_keys]
+            asset_alpha = float(m.get("alpha") or 0.0)
+
+            # Weight contributions
+            for j in range(5):
+                portfolio_betas[j] += weights[i] * betas[j]
+            portfolio_alpha += weights[i] * asset_alpha
+
+            asset_detail.append({
+                "ticker": t,
+                "weight": round(float(weights[i]), 6),
+                "betas": {name: round(b, 4) for name, b in zip(factor_names, betas)},
+                "alpha": round(asset_alpha * 12 * 100, 4),  # annualised %
+                "r2": round(float(m.get("r2") or 0.0), 4),
+            })
+
+        # Annualise monthly alpha → yearly %
+        portfolio_alpha_annual = portfolio_alpha * 12
+
+        return {
+            "n_assets": len(tickers),
+            "tickers_missing_metrics": [t for t in tickers if t not in metric_map],
+            "portfolio_factor_exposures": {
+                name: round(float(portfolio_betas[j]), 4)
+                for j, name in enumerate(factor_names)
+            },
+            "portfolio_alpha_annual_pct": round(portfolio_alpha_annual * 100, 4),
+            "assets": asset_detail,
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error computing factor attribution")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Value-at-Risk (VaR) and Expected Shortfall (CVaR)
+# ---------------------------------------------------------------------------
+
+@router.post("/api/portfolio/var-cvar")
+async def var_cvar(req: CovarianceMetricsRequest):
+    """
+    Compute parametric and historical VaR / CVaR (Expected Shortfall)
+    at 95% and 99% confidence levels.
+    """
+    try:
+        tickers = [h.ticker for h in req.holdings if h.ticker]
+        if not tickers:
+            raise HTTPException(status_code=400, detail="No valid tickers provided")
+
+        weights_raw = np.array([h.weight for h in req.holdings], dtype=float)
+        weights_raw = np.clip(weights_raw, 0.0, None)
+        if float(np.nanmax(weights_raw)) > 1.5:
+            weights_raw = weights_raw / 100.0
+        w_sum = float(weights_raw.sum())
+        if w_sum <= 0:
+            raise HTTPException(status_code=400, detail="Holdings must have positive weights")
+        weights = weights_raw / w_sum
+
+        # Fetch 1 year of daily prices
+        prices, missing = _fetch_price_matrix(tickers, 365)
+        if prices.empty or prices.shape[0] < 30:
+            raise HTTPException(status_code=422, detail="Insufficient price data for VaR calculation")
+
+        present = [t for t in tickers if t in prices.columns]
+        if not present:
+            raise HTTPException(status_code=422, detail="No matching tickers in price data")
+
+        present_idx = [tickers.index(t) for t in present]
+        w = weights[present_idx]
+        w = w / w.sum()
+
+        daily_rets = prices[present].pct_change().dropna()
+        port_rets = (daily_rets.values @ w).flatten()
+
+        mu = float(np.mean(port_rets))
+        sigma = float(np.std(port_rets, ddof=1))
+
+        from scipy.stats import norm
+
+        results = {}
+        for conf, z in [("95", 1.6449), ("99", 2.3263)]:
+            # Parametric VaR (assumes normal distribution)
+            param_var = -(mu - z * sigma)
+            # Parametric CVaR
+            param_cvar = -(mu - sigma * float(norm.pdf(z) / (1 - norm.cdf(z))))
+
+            # Historical VaR
+            alpha = 1.0 - float(conf) / 100.0
+            sorted_rets = np.sort(port_rets)
+            var_idx = int(np.floor(alpha * len(sorted_rets)))
+            hist_var = -float(sorted_rets[var_idx])
+            # Historical CVaR (average of losses beyond VaR)
+            tail = sorted_rets[:var_idx + 1]
+            hist_cvar = -float(np.mean(tail)) if len(tail) > 0 else hist_var
+
+            results[f"var_{conf}"] = {
+                "parametric_daily_pct": round(param_var * 100, 4),
+                "parametric_annual_pct": round(param_var * math.sqrt(252) * 100, 4),
+                "historical_daily_pct": round(hist_var * 100, 4),
+                "historical_annual_pct": round(hist_var * math.sqrt(252) * 100, 4),
+            }
+            results[f"cvar_{conf}"] = {
+                "parametric_daily_pct": round(param_cvar * 100, 4),
+                "parametric_annual_pct": round(param_cvar * math.sqrt(252) * 100, 4),
+                "historical_daily_pct": round(hist_cvar * 100, 4),
+                "historical_annual_pct": round(hist_cvar * math.sqrt(252) * 100, 4),
+            }
+
+        return {
+            "n_observations": len(port_rets),
+            "tickers_missing": missing,
+            "daily_mean_return_pct": round(mu * 100, 6),
+            "daily_volatility_pct": round(sigma * 100, 6),
+            "risk_metrics": results,
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error computing VaR/CVaR")
         raise HTTPException(status_code=500, detail="Internal server error")

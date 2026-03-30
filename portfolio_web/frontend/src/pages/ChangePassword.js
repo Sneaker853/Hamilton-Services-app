@@ -59,40 +59,49 @@ const ChangePassword = ({ apiBase }) => {
       <section className="change-pw-glass change-pw-card">
         <form onSubmit={handleSubmit} className="change-pw-form">
           <div className="change-pw-form-group">
-            <label>Current Password</label>
+            <label htmlFor="cp-current">Current Password</label>
             <input
+              id="cp-current"
               type="password"
               className="form-control"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="••••••••"
+              aria-invalid={!!error}
+              aria-describedby={error ? 'cp-error' : undefined}
             />
           </div>
           <div className="change-pw-form-group">
-            <label>New Password</label>
+            <label htmlFor="cp-new">New Password</label>
             <input
+              id="cp-new"
               type="password"
               className="form-control"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="••••••••"
+              aria-invalid={!!error}
+              aria-describedby={error ? 'cp-error' : undefined}
             />
             <span className="change-pw-hint">
               Min 10 characters, include uppercase, lowercase, number, and symbol.
             </span>
           </div>
           <div className="change-pw-form-group">
-            <label>Confirm New Password</label>
+            <label htmlFor="cp-confirm">Confirm New Password</label>
             <input
+              id="cp-confirm"
               type="password"
               className="form-control"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
+              aria-invalid={!!error}
+              aria-describedby={error ? 'cp-error' : undefined}
             />
           </div>
 
-          {error && <div className="change-pw-error">{error}</div>}
+          {error && <div className="change-pw-error" id="cp-error" role="alert">{error}</div>}
           {success && <div className="change-pw-success">{success}</div>}
 
           <button type="submit" className="change-pw-submit" disabled={loading}>

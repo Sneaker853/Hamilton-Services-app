@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import psycopg2
 from sklearn.covariance import LedoitWolf, OAS
+from sklearn.linear_model import RidgeCV
 from dotenv import load_dotenv
 import os
 
@@ -153,15 +154,26 @@ def _geometric_annualized_from_monthly(monthly_returns: np.ndarray) -> float:
     return float(growth ** (12.0 / periods) - 1.0)
 
 
-def _ridge_fit_factor_model(x: np.ndarray, y: np.ndarray, ridge_lambda: float = 1e-3) -> np.ndarray:
-    xtx = x.T @ x
-    reg = np.eye(xtx.shape[0]) * ridge_lambda
-    reg[0, 0] = 0.0
+def _ridge_fit_factor_model(x: np.ndarray, y: np.ndarray, ridge_lambda: float = 1e-3) -> tuple[np.ndarray, float]:
+    """Fit FF5 factor model with cross-validated ridge regression.
+
+    Returns (coef_with_intercept, best_alpha) where coef[0] is the intercept (alpha).
+    The ridge_lambda parameter is ignored — kept for API compatibility.
+    Cross-validation selects the best regularisation strength automatically.
+    """
+    # x already has intercept column at index 0 — strip it for RidgeCV (which fits its own)
+    x_no_intercept = x[:, 1:]
+    alphas = np.logspace(-4, 2, 50)
     try:
-        coef = np.linalg.solve(xtx + reg, x.T @ y)
-    except np.linalg.LinAlgError:
+        ridge = RidgeCV(alphas=alphas, fit_intercept=True, scoring="r2")
+        ridge.fit(x_no_intercept, y)
+        coef = np.concatenate([[ridge.intercept_], ridge.coef_])
+        best_alpha = float(ridge.alpha_)
+    except Exception:
+        # Fallback to lstsq if CV fails
         coef, *_ = np.linalg.lstsq(x, y, rcond=None)
-    return coef
+        best_alpha = ridge_lambda
+    return coef, best_alpha
 
 
 def _blended_expected_return(
@@ -183,7 +195,7 @@ def _blended_expected_return(
     ff5_valid = ff5_annual_return is not None and np.isfinite(ff5_annual_return)
     ff5_component = float(ff5_annual_return) if ff5_valid else prior
 
-    sample_conf = float(np.clip((sample_months - 24) / 60.0, 0.0, 1.0))
+    sample_conf = float(np.clip((sample_months - 36) / 48.0, 0.0, 1.0))
     r2_conf = float(np.clip(r2 if r2 is not None and np.isfinite(r2) else 0.0, 0.0, 1.0))
     model_conf = sample_conf * (0.5 + 0.5 * r2_conf)
 
@@ -386,10 +398,10 @@ def ensure_asset_metrics_table(conn) -> None:
     cur.close()
 
 
-def _compute_confidence_score(sample_months: int, r2: float | None, residual_std: float | None) -> float:
+def _compute_confidence_score(sample_months: int, r2: float | None, residual_std: float | None, beta_se_penalty: float = 0.0) -> float:
     """
     Composite expected-return confidence score ∈ [0, 1].
-    Factors: sample depth, model R², residual noise level.
+    Factors: sample depth, model R², residual noise level, beta SE penalty.
     """
     # Sample depth component: 0 at 6 months, 1 at 84+ months
     depth = float(np.clip((sample_months - 6) / 78.0, 0.0, 1.0))
@@ -405,7 +417,9 @@ def _compute_confidence_score(sample_months: int, r2: float | None, residual_std
 
     # Weighted combination
     score = 0.40 * depth + 0.35 * r2_val + 0.25 * noise_penalty
-    return float(np.clip(score, 0.0, 1.0))
+    # Apply beta SE penalty (reduces confidence when beta estimate is imprecise)
+    score = float(np.clip(score - beta_se_penalty, 0.0, 1.0))
+    return score
 
 
 def main() -> None:
@@ -467,13 +481,14 @@ def main() -> None:
         r2 = None
         ff5_annual = None
         residual_std = None
+        beta_se_penalty = 0.0
 
-        if sample_months >= 24:
+        if sample_months >= 36:
             y = aligned["monthly_return"] - aligned["RF"]
             x = aligned[["Mkt-RF", "SMB", "HML", "RMW", "CMA"]].values
             x = np.column_stack([np.ones(len(x)), x])
 
-            coef = _ridge_fit_factor_model(x, y.values, ridge_lambda=1e-3)
+            coef, _best_alpha = _ridge_fit_factor_model(x, y.values, ridge_lambda=1e-3)
             alpha = float(np.clip(coef[0], -0.2, 0.2))
             betas = [float(np.clip(v, -3.0, 3.0)) for v in coef[1:]]
 
@@ -486,6 +501,21 @@ def main() -> None:
             # Residual standard deviation (monthly)
             residuals = y.values - y_hat
             residual_std = float(np.std(residuals, ddof=1)) if len(residuals) > 1 else None
+
+            # Beta standard error penalty: penalise confidence when 95% CI
+            # width > 50% of the beta_mkt point estimate
+            beta_se_penalty = 0.0
+            if residual_std is not None and betas[0] is not None and len(y) > 6:
+                mse = float(ss_res / max(len(y) - 6, 1))  # 6 params: intercept + 5 factors
+                try:
+                    xtx_inv = np.linalg.inv(x.T @ x)
+                    se_beta_mkt = float(np.sqrt(mse * xtx_inv[1, 1]))
+                    ci_width = 2 * 1.96 * se_beta_mkt
+                    beta_abs = abs(betas[0]) if abs(betas[0]) > 0.01 else 0.01
+                    if ci_width > 0.5 * beta_abs:
+                        beta_se_penalty = float(np.clip((ci_width / beta_abs - 0.5) / 1.5, 0.0, 0.4))
+                except np.linalg.LinAlgError:
+                    pass
 
             factor_means = aligned[["Mkt-RF", "SMB", "HML", "RMW", "CMA", "RF"]].mean()
             mu_monthly = float(
@@ -534,7 +564,7 @@ def main() -> None:
 
         volatility = _clip_vol(asset_class, float(volatility))
 
-        confidence_score = _compute_confidence_score(sample_months, r2, residual_std)
+        confidence_score = _compute_confidence_score(sample_months, r2, residual_std, beta_se_penalty)
 
         metrics_rows.append(
             (

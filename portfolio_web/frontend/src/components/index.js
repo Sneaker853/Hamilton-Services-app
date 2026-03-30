@@ -24,5 +24,11 @@ export {
   CorrelationHeatmap
 } from './Charts';
 
+// Tooltip
+export { Tooltip, HelpIcon } from './Tooltip';
+
+// Modal
+export { ConfirmModal } from './ConfirmModal';
+
 // Theme
 export { useThemeStore, applyTheme } from './ThemeContext';

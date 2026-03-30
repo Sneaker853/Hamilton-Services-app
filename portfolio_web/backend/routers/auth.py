@@ -1,5 +1,6 @@
 from typing import Optional
 import hashlib
+import logging
 import secrets
 import re
 from datetime import datetime, timedelta, UTC
@@ -39,6 +40,8 @@ from config import (
     ADMIN_ALLOWED_EMAIL,
 )
 from emailer import send_email
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -158,7 +161,7 @@ def _send_password_reset_email(email: str, token: str) -> None:
 @router.post("/register", response_model=AuthResponse)
 async def register_user(request: AuthRegisterRequest, response: Response):
     email = request.email.strip().lower()
-    is_owner_email = email == ADMIN_ALLOWED_EMAIL
+    is_owner_email = bool(ADMIN_ALLOWED_EMAIL) and email == ADMIN_ALLOWED_EMAIL
     if "@" not in email:
         raise HTTPException(status_code=400, detail="Invalid email address")
     _validate_password_strength(request.password)
@@ -217,7 +220,7 @@ async def login_user(request: AuthLoginRequest, response: Response):
     if not verify_password(request.password, user["password_hash"], user["password_salt"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if email == ADMIN_ALLOWED_EMAIL and not bool(user.get("is_admin", False)):
+    if ADMIN_ALLOWED_EMAIL and email == ADMIN_ALLOWED_EMAIL and not bool(user.get("is_admin", False)):
         with get_cursor(dict_cursor=True) as (conn, cur):
             cur.execute(
                 """
@@ -316,10 +319,10 @@ async def request_password_reset(request: PasswordResetRequest):
         )
 
         if not sent and APP_ENV != "production":
+            logger.info("Password reset debug link for %s: %s/login?reset_token=%s", email, APP_PUBLIC_URL, reset_token)
             return {
                 "success": True,
-                "message": "SMTP not configured in development. Use the reset link below.",
-                "debug_link": f"{APP_PUBLIC_URL}/login?reset_token={reset_token}",
+                "message": "SMTP not configured in development. Check server logs for the reset link.",
             }
 
     return {"success": True, "message": "If the account exists, a password reset email has been sent."}

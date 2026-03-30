@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { FiMail, FiMapPin, FiSend } from 'react-icons/fi';
 import './Contact.css';
+
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const PROD_API_BASE = 'https://hamilton-services-backend.onrender.com/api';
+const normalizeApiBase = (value) => String(value || '').trim().replace(/\/+$/, '');
+const isLocalApiBase = (value) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(String(value || '').trim());
+const API_BASE = (() => {
+  const env = normalizeApiBase(process.env.REACT_APP_API_URL);
+  if (IS_PRODUCTION) return env && !isLocalApiBase(env) ? env : PROD_API_BASE;
+  return env || '/api';
+})();
 
 const Contact = () => {
   const [name, setName] = useState('');
@@ -8,15 +19,27 @@ const Contact = () => {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   const CONTACT_EMAIL = 'contact@hamilton-services.ca';
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const mailtoBody = `Name: ${name}\nEmail: ${email}\n\n${message}`;
-    const mailtoLink = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject || 'Contact Form Inquiry')}&body=${encodeURIComponent(mailtoBody)}`;
-    window.location.href = mailtoLink;
-    setSubmitted(true);
+    setError(null);
+    setSubmitting(true);
+
+    try {
+      const response = await axios.post(`${API_BASE}/contact`, {
+        name, email, subject, message,
+      }, { timeout: 15000 });
+      setSubmitted(true);
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err?.response?.data?.message || 'Unable to send your message. Please try again or email us directly.';
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -54,7 +77,7 @@ const Contact = () => {
           {submitted ? (
             <div className="contact-success">
               <FiSend className="contact-success-icon" />
-              <p>Your email client should have opened with the message pre-filled. If it didn't, please email us directly at <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
+              <p>Thank you! Your message has been sent. We typically respond within 1–2 business days.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="contact-form">
@@ -103,8 +126,9 @@ const Contact = () => {
                   required
                 />
               </div>
-              <button type="submit" className="contact-submit-btn">
-                <FiSend /> Send Message
+              {error && <div className="contact-error" role="alert">{error}</div>}
+              <button type="submit" className="contact-submit-btn" disabled={submitting}>
+                <FiSend /> {submitting ? 'Sending...' : 'Send Message'}
               </button>
             </form>
           )}

@@ -7,6 +7,34 @@
   border-radius: 16px;
 }
 
+.pg-persona-desc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #94a3b8;
+  padding: 8px 10px;
+  background: rgba(100, 116, 139, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid #22d3ee;
+}
+
+.pg-retry-btn {
+  display: inline-block;
+  margin-left: 12px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.pg-retry-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 .portfolio-generator-root .pg-layout-grid {
   display: grid;
   gap: 18px;

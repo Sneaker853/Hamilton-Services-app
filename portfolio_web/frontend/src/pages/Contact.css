@@ -218,6 +218,15 @@ a.contact-info-value:hover {
   text-decoration: underline;
 }
 
+.contact-error {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
 @media (max-width: 900px) {
   .contact-layout {
     grid-template-columns: 1fr;

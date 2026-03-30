@@ -56,7 +56,10 @@ ADMIN_RATE_LIMIT = int(os.getenv("ADMIN_RATE_LIMIT", "20"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
 MARKET_DATA_CACHE_TTL_SECONDS = int(os.getenv("MARKET_DATA_CACHE_TTL_SECONDS", "60"))
 PORTFOLIO_RISK_FREE_RATE = float(os.getenv("PORTFOLIO_RISK_FREE_RATE", "0.02"))
-ADMIN_ALLOWED_EMAIL = os.getenv("ADMIN_ALLOWED_EMAIL", "loris@spatafora.ca").strip().lower()
+ADMIN_ALLOWED_EMAIL = os.getenv("ADMIN_ALLOWED_EMAIL", "").strip().lower()
+if not ADMIN_ALLOWED_EMAIL and APP_ENV == "production":
+    raise RuntimeError("ADMIN_ALLOWED_EMAIL must be set in production")
+CONTACT_TO_EMAIL = os.getenv("CONTACT_TO_EMAIL", ADMIN_ALLOWED_EMAIL or "contact@hamilton-services.ca")
 
 PRODUCTION_REQUIRED_ORIGINS = [
     "https://hamilton-services.ca",

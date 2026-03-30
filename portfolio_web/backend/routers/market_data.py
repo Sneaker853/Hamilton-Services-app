@@ -132,17 +132,14 @@ async def get_stocks_summary():
 
 @router.get("/api/stocks/all")
 async def get_all_stocks():
+    cached = market_data_cache.get("stocks_all")
+    if cached is not None:
+        return cached
+
     try:
         with get_cursor(dict_cursor=True) as (_, cur):
             cur.execute(
                 """
-                WITH latest_prices AS (
-                    SELECT DISTINCT ON (ticker)
-                        ticker,
-                        close
-                    FROM price_history
-                    ORDER BY ticker, date DESC
-                )
                 SELECT
                     s.ticker,
                     s.name,
@@ -155,16 +152,37 @@ async def get_all_stocks():
                     s.revenue,
                     s.dividend_yield,
                     COALESCE(s.asset_class, 'stock') AS asset_class,
-                    lp.close AS current_price,
+                    ph.close AS current_price,
                     m.expected_return,
                     m.volatility
                 FROM stocks s
                 LEFT JOIN asset_metrics m ON m.ticker = s.ticker
-                LEFT JOIN latest_prices lp ON lp.ticker = s.ticker
+                LEFT JOIN LATERAL (
+                    SELECT close FROM price_history
+                    WHERE ticker = s.ticker
+                    ORDER BY date DESC LIMIT 1
+                ) ph ON true
                 ORDER BY s.ticker
                 """
             )
             stocks = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT
+                    MAX(latest_date) AS latest_price_date,
+                    COUNT(*) AS tickers_with_price,
+                    COUNT(*) FILTER (
+                        WHERE latest_date = (SELECT MAX(date) FROM price_history)
+                    ) AS latest_price_ticker_count
+                FROM (
+                    SELECT ticker, MAX(date) AS latest_date
+                    FROM price_history
+                    GROUP BY ticker
+                ) t
+                """
+            )
+            freshness = cur.fetchone()
 
         stocks_list = []
         for stock in stocks:
@@ -182,7 +200,15 @@ async def get_all_stocks():
 
             stocks_list.append(stock_dict)
 
-        return {"stocks": stocks_list, "total": len(stocks_list)}
+        result = {
+            "stocks": stocks_list,
+            "total": len(stocks_list),
+            "latest_price_date": freshness["latest_price_date"].isoformat() if freshness and freshness.get("latest_price_date") else None,
+            "latest_price_ticker_count": int(freshness["latest_price_ticker_count"]) if freshness and freshness.get("latest_price_ticker_count") is not None else 0,
+            "tickers_with_price": int(freshness["tickers_with_price"]) if freshness and freshness.get("tickers_with_price") is not None else 0,
+        }
+        market_data_cache.set("stocks_all", result)
+        return result
     except Exception:
         logger.exception("Error fetching securities")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -190,17 +216,14 @@ async def get_all_stocks():
 
 @router.get("/api/etfs/all")
 async def get_all_etfs():
+    cached = market_data_cache.get("etfs_all")
+    if cached is not None:
+        return cached
+
     try:
         with get_cursor(dict_cursor=True) as (_, cur):
             cur.execute(
                 """
-                WITH latest_prices AS (
-                    SELECT DISTINCT ON (ticker)
-                        ticker,
-                        close
-                    FROM price_history
-                    ORDER BY ticker, date DESC
-                )
                 SELECT
                     s.ticker,
                     s.name,
@@ -213,12 +236,16 @@ async def get_all_etfs():
                     s.revenue,
                     s.dividend_yield,
                     s.asset_class,
-                    lp.close AS current_price,
+                    ph.close AS current_price,
                     m.expected_return,
                     m.volatility
                 FROM stocks s
                 LEFT JOIN asset_metrics m ON m.ticker = s.ticker
-                LEFT JOIN latest_prices lp ON lp.ticker = s.ticker
+                LEFT JOIN LATERAL (
+                    SELECT close FROM price_history
+                    WHERE ticker = s.ticker
+                    ORDER BY date DESC LIMIT 1
+                ) ph ON true
                 WHERE LOWER(COALESCE(s.asset_class, '')) = 'etf'
                 ORDER BY s.ticker
                 """
@@ -237,7 +264,9 @@ async def get_all_etfs():
                         etf_dict[key] = None
             etfs_list.append(etf_dict)
 
-        return {"etfs": etfs_list, "total": len(etfs_list)}
+        result = {"etfs": etfs_list, "total": len(etfs_list)}
+        market_data_cache.set("etfs_all", result)
+        return result
     except Exception:
         logger.exception("Error fetching ETFs")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -245,17 +274,14 @@ async def get_all_etfs():
 
 @router.get("/api/bonds/all")
 async def get_all_bonds():
+    cached = market_data_cache.get("bonds_all")
+    if cached is not None:
+        return cached
+
     try:
         with get_cursor(dict_cursor=True) as (_, cur):
             cur.execute(
                 """
-                WITH latest_prices AS (
-                    SELECT DISTINCT ON (ticker)
-                        ticker,
-                        close
-                    FROM price_history
-                    ORDER BY ticker, date DESC
-                )
                 SELECT
                     s.ticker,
                     s.name,
@@ -268,12 +294,16 @@ async def get_all_bonds():
                     s.revenue,
                     s.dividend_yield,
                     s.asset_class,
-                    lp.close AS current_price,
+                    ph.close AS current_price,
                     m.expected_return,
                     m.volatility
                 FROM stocks s
                 LEFT JOIN asset_metrics m ON m.ticker = s.ticker
-                LEFT JOIN latest_prices lp ON lp.ticker = s.ticker
+                LEFT JOIN LATERAL (
+                    SELECT close FROM price_history
+                    WHERE ticker = s.ticker
+                    ORDER BY date DESC LIMIT 1
+                ) ph ON true
                 WHERE LOWER(COALESCE(s.asset_class, '')) = 'bond'
                 ORDER BY s.ticker
                 """
@@ -292,7 +322,9 @@ async def get_all_bonds():
                         bond_dict[key] = None
             bonds_list.append(bond_dict)
 
-        return {"bonds": bonds_list, "total": len(bonds_list)}
+        result = {"bonds": bonds_list, "total": len(bonds_list)}
+        market_data_cache.set("bonds_all", result)
+        return result
     except Exception:
         logger.exception("Error fetching bonds")
         raise HTTPException(status_code=500, detail="Internal server error")

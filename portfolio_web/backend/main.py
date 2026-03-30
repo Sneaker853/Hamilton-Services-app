@@ -12,9 +12,10 @@ import uuid
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from config import get_allowed_origins, get_allowed_origin_regex, origin_is_allowed
+from config import get_allowed_origins, get_allowed_origin_regex, origin_is_allowed, APP_ENV
 from db import init_db_pool, close_db_pool, check_db_health
 from services import initialize_services
 from migrations_runner import run_migrations
@@ -28,12 +29,14 @@ from config import (
     SESSION_COOKIE_NAME,
     CSRF_COOKIE_NAME,
     CSRF_PROTECTION_ENABLED,
+    CONTACT_TO_EMAIL,
 )
 from security import get_session_csrf_token
 from routers.auth import router as auth_router
 from routers.portfolio import router as portfolio_router
 from routers.market_data import router as market_data_router
 from routers.admin import router as admin_router
+from emailer import send_email
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -44,7 +47,11 @@ _request_count = 0
 _error_count = 0
 _total_latency_ms = 0.0
 _auth_limiter = SlidingWindowRateLimiter(limit=AUTH_RATE_LIMIT, window_seconds=RATE_LIMIT_WINDOW_SECONDS)
+_login_limiter = SlidingWindowRateLimiter(limit=5, window_seconds=300)
+_password_reset_limiter = SlidingWindowRateLimiter(limit=3, window_seconds=600)
+_register_limiter = SlidingWindowRateLimiter(limit=10, window_seconds=600)
 _admin_limiter = SlidingWindowRateLimiter(limit=ADMIN_RATE_LIMIT, window_seconds=RATE_LIMIT_WINDOW_SECONDS)
+_contact_limiter = SlidingWindowRateLimiter(limit=3, window_seconds=600)
 _allowed_origins = set(get_allowed_origins())
 _allowed_origin_regex = get_allowed_origin_regex()
 
@@ -81,6 +88,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if APP_ENV == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self'; "
+            "connect-src 'self'"
+        )
+    return response
 
 
 def _corsify_early_response(request: Request, response: JSONResponse) -> JSONResponse:
@@ -138,7 +166,16 @@ async def request_context_middleware(request: Request, call_next):
     client_id = get_request_client_id(request)
 
     if request.url.path.startswith("/api/auth"):
-        result = _auth_limiter.check(client_id)
+        # Per-endpoint rate limiting for sensitive auth endpoints
+        auth_path = request.url.path.rstrip("/")
+        if auth_path == "/api/auth/login":
+            result = _login_limiter.check(client_id)
+        elif auth_path == "/api/auth/register":
+            result = _register_limiter.check(client_id)
+        elif auth_path == "/api/auth/password-reset/request":
+            result = _password_reset_limiter.check(client_id)
+        else:
+            result = _auth_limiter.check(client_id)
         if not result.allowed:
             return _corsify_early_response(request, JSONResponse(
                 status_code=429,
@@ -265,6 +302,41 @@ app.include_router(auth_router)
 app.include_router(portfolio_router)
 app.include_router(market_data_router)
 app.include_router(admin_router)
+
+
+@app.post("/api/contact")
+async def contact_submit(request: Request):
+    client_id = get_request_client_id(request)
+    result = _contact_limiter.check(client_id)
+    if not result.allowed:
+        return JSONResponse(
+            status_code=429,
+            content={"message": "Too many contact requests. Please try again later."},
+        )
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+
+    name = str(body.get("name", "")).strip()[:200]
+    email = str(body.get("email", "")).strip()[:200]
+    subject = str(body.get("subject", "")).strip()[:300] or "Contact Form Inquiry"
+    message = str(body.get("message", "")).strip()[:5000]
+
+    if not name or not email or not message:
+        raise HTTPException(status_code=400, detail="Name, email, and message are required.")
+
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+
+    email_body = f"New contact form submission:\n\nName: {name}\nEmail: {email}\n\n{message}"
+    sent = send_email(CONTACT_TO_EMAIL, f"[Contact] {subject}", email_body)
+    if sent:
+        return {"message": "Your message has been sent. We'll get back to you soon."}
+    else:
+        logger.warning("Contact form email not sent (SMTP not configured). From: %s", email)
+        return {"message": "Your message has been received. We'll get back to you soon."}
 
 
 @app.exception_handler(HTTPException)

@@ -4,6 +4,24 @@
   color: #e2e8f0;
 }
 
+.skip-to-main {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10000;
+  padding: 12px 24px;
+  background: #22d3ee;
+  color: #0a0e1a;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 0 0 8px 0;
+  text-decoration: none;
+}
+
+.skip-to-main:focus {
+  left: 0;
+}
+
 .shell-sidebar {
   position: fixed;
   top: 0;

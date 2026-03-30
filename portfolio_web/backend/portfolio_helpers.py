@@ -68,7 +68,7 @@ def load_mean_returns_and_covariance(
             WITH recent_dates AS (
                 SELECT date FROM price_history
                 WHERE ticker = ANY(%s)
-                GROUP BY date ORDER BY date DESC LIMIT 400
+                GROUP BY date ORDER BY date DESC LIMIT 800
             )
             SELECT date, ticker, close
             FROM price_history
@@ -87,12 +87,14 @@ def load_mean_returns_and_covariance(
         raise HTTPException(status_code=400, detail="No price data found for selected tickers")
 
     prices_pivot = prices_df.pivot(index="date", columns="ticker", values="close")
-    prices_pivot = prices_pivot.dropna(axis=0, how="any")
+    # Forward-fill individual stock gaps (max 3 trading days) instead of
+    # dropping entire dates — preserves much more history.
+    prices_pivot = prices_pivot.ffill(limit=3).dropna(axis=0, how="any")
 
     if prices_pivot.shape[0] < 30:
         raise HTTPException(status_code=400, detail="Insufficient aligned price history for covariance metrics")
 
-    prices_pivot = prices_pivot.tail(252)
+    prices_pivot = prices_pivot.tail(600)
     returns_df = prices_pivot.pct_change().dropna()
     aligned_tickers = list(prices_pivot.columns)
 
@@ -162,7 +164,20 @@ def fetch_price_matrix(
 
     df = pd.DataFrame(rows)
     pivot = df.pivot_table(index="date", columns="ticker", values="close")
-    pivot = pivot.sort_index().ffill().dropna(how="any").astype(float)
+    pivot = pivot.sort_index()
+
+    # Forward-fill all gaps: for active tickers this fills short gaps,
+    # for delisted tickers their last known price persists (flat return)
+    # which avoids survivorship bias by keeping terminal value.
+    pivot = pivot.ffill()
+
+    # Only drop rows where ALL tickers are NaN (leading NaN before first data)
+    pivot = pivot.dropna(how="all")
+    # Drop any tickers that have no data at all
+    pivot = pivot.dropna(axis=1, how="all")
+    # Fill any remaining leading NaN per ticker with the first available price
+    pivot = pivot.bfill().astype(float)
+
     missing = [t for t in tickers if t not in pivot.columns]
     return pivot, missing
 

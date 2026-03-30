@@ -101,6 +101,16 @@ class DriftMonitorRequest(BaseModel):
     rebalance_threshold: float = Field(5.0, gt=0, le=50, description="Drift % threshold to trigger rebalance recommendation")
 
 
+class AnalyzeHolding(BaseModel):
+    ticker: str = Field(..., min_length=1, max_length=10)
+    weight: float = Field(0.0, ge=0, le=100)
+    value: float = Field(0.0, ge=0)
+
+
+class AnalyzePortfolioRequest(BaseModel):
+    holdings: List[AnalyzeHolding] = Field(..., min_length=1, max_length=100)
+
+
 class AuthRegisterRequest(BaseModel):
     email: str
     password: str
@@ -119,7 +129,6 @@ class AuthResponse(BaseModel):
 class MessageResponse(BaseModel):
     success: bool
     message: str
-    debug_link: Optional[str] = None
 
 
 class PasswordResetRequest(BaseModel):
@@ -141,8 +150,8 @@ class VerifyEmailConfirmRequest(BaseModel):
 
 
 class SavePortfolioRequest(BaseModel):
-    name: str
-    source: str
+    name: str = Field(..., min_length=1, max_length=255)
+    source: str = Field(..., min_length=1, max_length=100)
     data: Dict
 
 

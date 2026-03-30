@@ -83,7 +83,7 @@ export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => 
 
     return (
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={merged} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <LineChart data={merged} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label="Performance chart showing historical and projected portfolio value over time">
           <CartesianGrid stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="3 3" />
           <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
           <YAxis stroke="#94a3b8" fontSize={11} />
@@ -119,7 +119,7 @@ export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => 
   if (hasHistorical) {
     return (
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={historicalData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <LineChart data={historicalData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label="Historical portfolio performance chart">
           <CartesianGrid stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="3 3" />
           <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
           <YAxis stroke="#94a3b8" fontSize={11} />
@@ -142,7 +142,7 @@ export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => 
   // Projected only (fallback — no historical data available)
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label="Projected portfolio performance chart">
         <CartesianGrid stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="3 3" />
         <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
         <YAxis stroke="#94a3b8" fontSize={11} />
@@ -271,7 +271,7 @@ export const EfficientFrontierChart = ({ data, height = 260 }) => {
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <ComposedChart data={smoothCurve} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+      <ComposedChart data={smoothCurve} margin={{ top: 10, right: 10, left: 0, bottom: 20 }} role="img" aria-label="Efficient frontier chart showing optimal risk-return tradeoff curve">
         <CartesianGrid stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="3 3" />
         <XAxis
           type="number"
@@ -325,7 +325,7 @@ export const RiskReturnScatter = ({ data, height = 260 }) => {
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <ScatterChart margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+      <ScatterChart margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label="Scatter plot showing risk versus expected return for each holding">
         <CartesianGrid stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="3 3" />
         <XAxis
           type="number"
@@ -383,7 +383,7 @@ export const CorrelationHeatmap = ({ matrix, labels }) => {
   }
 
   return (
-    <div style={{ overflow: 'auto', maxHeight: '460px', width: '100%', paddingBottom: '4px' }}>
+    <div style={{ overflow: 'auto', maxHeight: '460px', width: '100%', paddingBottom: '4px' }} role="img" aria-label="Correlation heatmap showing pairwise correlations between portfolio holdings">
       <div style={{ display: 'grid', gridTemplateColumns: `120px repeat(${labels.length}, 40px)`, gap: '6px', width: 'max-content', minWidth: '100%' }}>
         <div />
         {labels.map((label) => (

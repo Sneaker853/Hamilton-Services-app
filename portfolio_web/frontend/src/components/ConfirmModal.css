@@ -1,0 +1,116 @@
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  animation: confirmOverlayIn 0.15s ease;
+}
+
+.confirm-modal-glass {
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  animation: confirmSlideIn 0.2s ease;
+}
+
+.confirm-modal-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.confirm-modal-message {
+  margin: 0 0 24px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #94a3b8;
+  white-space: pre-line;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.confirm-modal-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.confirm-modal-btn:active {
+  transform: scale(0.97);
+}
+
+.confirm-modal-btn.cancel {
+  background: rgba(100, 116, 139, 0.2);
+  color: #cbd5e1;
+}
+
+.confirm-modal-btn.cancel:hover {
+  background: rgba(100, 116, 139, 0.35);
+}
+
+.confirm-modal-btn.primary {
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  color: #fff;
+}
+
+.confirm-modal-btn.primary:hover {
+  background: linear-gradient(135deg, #22d3ee, #06b6d4);
+}
+
+.confirm-modal-btn.danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+}
+
+.confirm-modal-btn.danger:hover {
+  background: linear-gradient(135deg, #f87171, #ef4444);
+}
+
+[data-theme="light"] .confirm-modal-glass {
+  background: rgba(255, 255, 255, 0.97);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .confirm-modal-title {
+  color: #1e293b;
+}
+
+[data-theme="light"] .confirm-modal-message {
+  color: #64748b;
+}
+
+[data-theme="light"] .confirm-modal-btn.cancel {
+  background: rgba(0, 0, 0, 0.06);
+  color: #475569;
+}
+
+[data-theme="light"] .confirm-modal-btn.cancel:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+@keyframes confirmOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes confirmSlideIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}

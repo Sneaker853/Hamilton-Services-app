@@ -2,8 +2,16 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { FiTrendingUp, FiDollarSign, FiLayers, FiPieChart, FiBarChart2, FiSettings } from 'react-icons/fi';
-import { Button, Card, CardHeader, CardBody, LoadingSkeleton, CardSkeleton } from '../components';
+import { Button, Card, CardHeader, CardBody, LoadingSkeleton, CardSkeleton, HelpIcon } from '../components';
 import './PortfolioGenerator.css';
+
+const PERSONA_DESCRIPTIONS = {
+  conservative: 'Low risk tolerance. Prioritizes capital preservation with stable, income-generating assets. Expected returns: 4–6% annually.',
+  moderate_conservative: 'Below-average risk. Balances stability with modest growth. Expected returns: 5–7% annually.',
+  balanced: 'Medium risk tolerance. Equal emphasis on growth and stability. Expected returns: 6–9% annually.',
+  moderate_aggressive: 'Above-average risk. Tilts toward growth with higher volatility tolerance. Expected returns: 8–12% annually.',
+  aggressive: 'High risk tolerance. Maximizes growth potential, accepts significant drawdowns. Expected returns: 10–15% annually.',
+};
 
 const PortfolioGenerator = ({ apiBase }) => {
   const [personas, setPersonas] = useState([]);
@@ -300,6 +308,9 @@ const PortfolioGenerator = ({ apiBase }) => {
                     </option>
                   ))}
                 </select>
+                {PERSONA_DESCRIPTIONS[formData.persona_name] && (
+                  <p className="pg-persona-desc">{PERSONA_DESCRIPTIONS[formData.persona_name]}</p>
+                )}
               )}
             </div>
 
@@ -349,7 +360,7 @@ const PortfolioGenerator = ({ apiBase }) => {
 
             <div className="pg-two-col-grid">
               <div className="form-group">
-                <label>Max Position (%)</label>
+                <label>Max Position (%) <HelpIcon text="Maximum percentage of the portfolio that any single holding can represent. Lower values increase diversification." /></label>
                 <input
                   type="number"
                   name="max_position_pct"
@@ -362,7 +373,7 @@ const PortfolioGenerator = ({ apiBase }) => {
                 />
               </div>
               <div className="form-group">
-                <label>Max Sector (%)</label>
+                <label>Max Sector (%) <HelpIcon text="Maximum percentage of the portfolio allocated to any single sector (e.g., Technology, Healthcare). Helps avoid concentration risk." /></label>
                 <input
                   type="number"
                   name="max_sector_pct"
@@ -402,7 +413,12 @@ const PortfolioGenerator = ({ apiBase }) => {
               </label>
             </div>
 
-            {error && <div className="error-message pg-form-error">{error}</div>}
+            {error && (
+              <div className="error-message pg-form-error">
+                {error}
+                <button type="button" className="pg-retry-btn" onClick={() => { setError(null); }}>Dismiss</button>
+              </div>
+            )}
 
             <Button 
               type="submit" 

@@ -214,26 +214,32 @@ const Login = ({ apiBase, fullScreen = false }) => {
 
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="form-group">
-              <label>Email</label>
+              <label htmlFor="login-email">Email</label>
               <input
+                id="login-email"
                 ref={emailInputRef}
                 type="email"
                 className="form-control"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
+                aria-invalid={!!error}
+                aria-describedby={error ? 'login-error' : undefined}
               />
             </div>
 
             {mode !== 'forgot' && (
               <div className="form-group">
-                <label>{mode === 'reset' ? 'New Password' : 'Password'}</label>
+                <label htmlFor="login-password">{mode === 'reset' ? 'New Password' : 'Password'}</label>
                 <input
+                  id="login-password"
                   type="password"
                   className="form-control"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  aria-invalid={!!error}
+                  aria-describedby={error ? 'login-error' : undefined}
                 />
                 {mode === 'login' && (
                   <div style={{ marginTop: '8px', textAlign: 'right' }}>
@@ -286,7 +292,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
                 )}
               </div>
             )}
-            {error && <div className="error-message">{error}</div>}
+            {error && <div className="error-message" id="login-error" role="alert">{error}</div>}
 
             <button className="btn-primary" type="submit" disabled={loading}>
               {loading ? 'Please wait...' : mode === 'signup' ? 'Create Account' : mode === 'forgot' ? 'Send Reset Link' : mode === 'reset' ? 'Set New Password' : 'Sign In'}

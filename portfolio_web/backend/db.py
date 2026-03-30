@@ -3,6 +3,7 @@ from typing import Generator
 import logging
 
 import psycopg2
+import psycopg2.pool
 from psycopg2.pool import ThreadedConnectionPool
 from psycopg2.extras import RealDictCursor
 
@@ -11,6 +12,8 @@ from config import DATABASE_URL, DB_POOL_MIN, DB_POOL_MAX
 logger = logging.getLogger(__name__)
 
 _db_pool: ThreadedConnectionPool | None = None
+
+DB_QUERY_TIMEOUT_MS = 30_000  # 30 seconds default statement timeout
 
 
 def init_db_pool() -> None:
@@ -33,15 +36,22 @@ def get_db_connection() -> Generator:
     if _db_pool is None:
         raise RuntimeError("Database pool is not initialized")
 
-    conn = _db_pool.getconn()
+    conn = None
+    try:
+        conn = _db_pool.getconn()
+    except psycopg2.pool.PoolError:
+        logger.error("Database connection pool exhausted")
+        raise RuntimeError("Database connection pool exhausted — try again shortly")
+
     try:
         yield conn
     finally:
-        _db_pool.putconn(conn)
+        if conn:
+            _db_pool.putconn(conn)
 
 
 @contextmanager
-def get_cursor(dict_cursor: bool = False) -> Generator:
+def get_cursor(dict_cursor: bool = False, timeout_ms: int = DB_QUERY_TIMEOUT_MS) -> Generator:
     with get_db_connection() as conn:
         if dict_cursor:
             cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -49,6 +59,7 @@ def get_cursor(dict_cursor: bool = False) -> Generator:
             cur = conn.cursor()
 
         try:
+            cur.execute("SET LOCAL statement_timeout = %s", (timeout_ms,))
             yield conn, cur
         finally:
             cur.close()

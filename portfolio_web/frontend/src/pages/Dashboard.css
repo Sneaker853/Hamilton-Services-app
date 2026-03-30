@@ -417,3 +417,13 @@
     padding: 12px;
   }
 }
+
+.dashboard-inline-link {
+  color: #22d3ee;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.dashboard-inline-link:hover {
+  text-decoration: underline;
+}

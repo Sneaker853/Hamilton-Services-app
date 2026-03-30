@@ -68,11 +68,34 @@ async def get_update_status(
             )
             status = cur.fetchone()
 
+            cur.execute(
+                """
+                WITH latest_prices AS (
+                    SELECT DISTINCT ON (ticker)
+                        ticker,
+                        date
+                    FROM price_history
+                    ORDER BY ticker, date DESC
+                )
+                SELECT
+                    MAX(date) AS latest_price_date,
+                    COUNT(*) AS tickers_with_price,
+                    COUNT(*) FILTER (
+                        WHERE date = (SELECT MAX(date) FROM latest_prices)
+                    ) AS latest_price_ticker_count
+                FROM latest_prices
+                """
+            )
+            price_status = cur.fetchone()
+
         return {
             "total_stocks": status["total_stocks"],
             "stocks_with_data": status["stocks_with_fundamentals"],
             "coverage_percent": round((status["stocks_with_fundamentals"] / status["total_stocks"] * 100) if status["total_stocks"] > 0 else 0, 2),
             "last_updated": status["last_updated"].isoformat() if status["last_updated"] else None,
+            "latest_price_date": price_status["latest_price_date"].isoformat() if price_status and price_status.get("latest_price_date") else None,
+            "latest_price_ticker_count": int(price_status["latest_price_ticker_count"]) if price_status and price_status.get("latest_price_ticker_count") is not None else 0,
+            "tickers_with_price": int(price_status["tickers_with_price"]) if price_status and price_status.get("tickers_with_price") is not None else 0,
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception:

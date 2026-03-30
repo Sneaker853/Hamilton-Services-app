@@ -1,16 +1,27 @@
 # Portfolio Platform — Project Handoff
 
-**Last Updated**: March 1, 2026
+**Last Updated**: March 8, 2026
 **Platform Status**: Launch-hardened MVP with security + financial + accessibility checklist completed and validated.
 **Brand Name**: Hamilton Services
 
 ## TL;DR for Next AI (Start Here)
 
-1. Read `EXECUTION_CHECKLIST_NEXT.md` first — it is now fully completed and reflects the latest implementation status.
-2. Read `portfolio_web/ops/drill_records/2026-03-01_readiness_dry_run.md` for the latest readiness evidence.
+1. Read [EXECUTION_CHECKLIST_NEXT.md](EXECUTION_CHECKLIST_NEXT.md) first — it is now fully completed and reflects the latest implementation status.
+2. Read [ops/drill_records/2026-03-01_readiness_dry_run.md](ops/drill_records/2026-03-01_readiness_dry_run.md) for the latest readiness evidence.
 3. Backend now uses cookie sessions + CSRF validation for state-changing API calls; frontend Axios auto-sends `X-CSRF-Token` from cookie.
 4. Security and financial test suites are expanded and currently passing (`45 passed` backend at last run).
-5. Highest-value next work is cleanup/polish: deprecation warnings (`on_event`, `utcnow`), optional router splitting, and deployment/staging rollout.
+5. March 8 production fixes: cross-site auth cookies now issue with `SameSite=None; Secure`, frontend auth requests explicitly send credentials, and `/api/auth/me` startup probe is skipped when no auth context exists.
+6. Highest-value next work is cleanup/polish: deprecation warnings (`on_event`, `utcnow`), optional router splitting, and deployment/staging rollout.
+
+### Quick Links
+
+- [PUBLISH_READINESS_CHECKLIST.md](PUBLISH_READINESS_CHECKLIST.md)
+- [FINANCIAL_QUALITY_AUDIT.md](FINANCIAL_QUALITY_AUDIT.md)
+- [portfolio_web/backend/main.py](portfolio_web/backend/main.py)
+- [portfolio_web/backend/routers/market_data.py](portfolio_web/backend/routers/market_data.py)
+- [portfolio_web/backend/routers/auth.py](portfolio_web/backend/routers/auth.py)
+- [portfolio_web/backend/tests/test_security_regressions.py](portfolio_web/backend/tests/test_security_regressions.py)
+- [portfolio_web/frontend/src/pages/PortfolioBuilder.js](portfolio_web/frontend/src/pages/PortfolioBuilder.js)
 
 ## March 1, 2026 Hardening Update
 
@@ -28,6 +39,15 @@
 - Builder accessibility improved with keyboard reorder controls, richer semantic labels, and tabpanel semantics/focus handling in analytics.
 - Frontend test coverage expanded with analytics empty-state resilience tests and holdings accessibility tests.
 - Production readiness dry run recorded in `portfolio_web/ops/drill_records/2026-03-01_readiness_dry_run.md`.
+
+## March 8, 2026 Production Stabilization Update
+
+- Resolved cross-site login/session issues between Render frontend/backend by enforcing auth cookies as `SameSite=None; Secure`.
+- Frontend production auth path hardened to always include credentials on auth endpoints and use explicit deployed backend API base fallback.
+- Login-page false-positive 401 noise reduced by skipping `/api/auth/me` probe when there is no auth context yet.
+- Market-data list endpoint performance improved by replacing per-row lateral latest-price lookups and adding index migration: `portfolio_web/backend/migrations/005_market_data_indexes.sql`.
+- Verified production account/login flow for `loris@spatafora.ca` and confirmed previous local/prod user mismatch root cause.
+- Added Render Python version pin in `portfolio_web/.python-version` for root-dir-specific builds.
 
 ---
 
@@ -98,7 +118,7 @@ C:\Database\
 │   │   │   ├── auth.py              # 8 endpoints (register, login, logout, password reset, email verify)
 │   │   │   ├── market_data.py       # 8 endpoints (stocks, ETFs, bonds, filters, ticker detail)
 │   │   │   └── admin.py             # 2 endpoints (update fundamentals, check status)
-│   │   ├── migrations/              # 4 SQL migration files (incl. CSRF session token)
+│   │   ├── migrations/              # 5 SQL migration files (incl. CSRF session token + market data indexes)
 │   │   └── tests/
 │   │       ├── test_api.py
 │   │       ├── test_financial_invariants.py
