@@ -7,9 +7,12 @@ import { downloadCsv } from '../utils/exportCsv';
 import './PortfolioGenerator.css';
 
 const PERSONA_DESCRIPTIONS = {
+  growth_seeker: 'Focus on high-growth companies with strong earnings momentum. Higher volatility accepted for greater upside potential. Expected returns: 10–15% annually.',
+  eco_friendly: 'Prioritize companies with strong ESG (Environmental, Social, Governance) profiles and sustainable practices. Moderate risk with ethical alignment.',
+  balanced: 'Medium risk tolerance. Equal emphasis on growth and stability. Expected returns: 6–9% annually.',
+  income_focus: 'Targets high dividend yields with stable, mature companies. Lower volatility with steady income streams. Expected returns: 4–7% annually.',
   conservative: 'Low risk tolerance. Prioritizes capital preservation with stable, income-generating assets. Expected returns: 4–6% annually.',
   moderate_conservative: 'Below-average risk. Balances stability with modest growth. Expected returns: 5–7% annually.',
-  balanced: 'Medium risk tolerance. Equal emphasis on growth and stability. Expected returns: 6–9% annually.',
   moderate_aggressive: 'Above-average risk. Tilts toward growth with higher volatility tolerance. Expected returns: 8–12% annually.',
   aggressive: 'High risk tolerance. Maximizes growth potential, accepts significant drawdowns. Expected returns: 10–15% annually.',
 };

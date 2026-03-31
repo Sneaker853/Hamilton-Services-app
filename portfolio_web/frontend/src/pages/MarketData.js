@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { ResponsiveContainer, Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 import { FiBarChart2, FiSearch, FiTrendingDown, FiTrendingUp } from 'react-icons/fi';
+import { HelpIcon } from '../components';
 import './MarketData.css';
 
 const periods = ['1W', '1M', '3M', '6M', '1Y', '5Y', 'MAX'];
@@ -323,12 +324,12 @@ const MarketData = ({ apiBase }) => {
                 </div>
 
                 <div className="market-metrics-grid">
-                  <div><p>Market Cap</p><strong>{formatLargeNumber(stockDetails.market_cap)}</strong></div>
-                  <div><p>P/E Ratio</p><strong>{stockDetails.pe_ratio ? stockDetails.pe_ratio.toFixed(2) : 'N/A'}</strong></div>
-                  <div><p>Beta</p><strong>{stockDetails.beta ? stockDetails.beta.toFixed(2) : 'N/A'}</strong></div>
-                  <div><p>ROE</p><strong>{formatPercent(stockDetails.roe)}</strong></div>
-                  <div><p>Dividend Yield</p><strong>{formatPercent(stockDetails.dividend_yield)}</strong></div>
-                  <div><p>Debt/Equity</p><strong>{stockDetails.debt_to_equity ? stockDetails.debt_to_equity.toFixed(2) : 'N/A'}</strong></div>
+                  <div><p>Market Cap <HelpIcon text="Total market value of a company's outstanding shares. Calculated as share price × total shares outstanding." /></p><strong>{formatLargeNumber(stockDetails.market_cap)}</strong></div>
+                  <div><p>P/E Ratio <HelpIcon text="Price-to-Earnings ratio. Compares a stock's price to its earnings per share. Lower P/E may indicate better value; higher P/E may reflect growth expectations." /></p><strong>{stockDetails.pe_ratio ? stockDetails.pe_ratio.toFixed(2) : 'N/A'}</strong></div>
+                  <div><p>Beta <HelpIcon text="Measures a stock's volatility relative to the overall market. Beta of 1 = moves with market. Above 1 = more volatile. Below 1 = less volatile." /></p><strong>{stockDetails.beta ? stockDetails.beta.toFixed(2) : 'N/A'}</strong></div>
+                  <div><p>ROE <HelpIcon text="Return on Equity. Measures how effectively a company uses shareholder money to generate profit. Higher ROE generally indicates better management efficiency." /></p><strong>{formatPercent(stockDetails.roe)}</strong></div>
+                  <div><p>Dividend Yield <HelpIcon text="Annual dividend payment as a percentage of the stock price. Shows how much income you earn per dollar invested, before any price changes." /></p><strong>{formatPercent(stockDetails.dividend_yield)}</strong></div>
+                  <div><p>Debt/Equity <HelpIcon text="Ratio of total debt to shareholder equity. Shows how much a company relies on borrowed money. Lower is generally safer; high ratios may signal financial risk." /></p><strong>{stockDetails.debt_to_equity ? stockDetails.debt_to_equity.toFixed(2) : 'N/A'}</strong></div>
                 </div>
               </article>
 
@@ -407,12 +408,12 @@ const MarketData = ({ apiBase }) => {
               <article className="market-glass market-financials-card">
                 <h4>Financial Metrics</h4>
                 <div className="market-metrics-grid financials">
-                  <div><p>Revenue</p><strong>{formatLargeNumber(stockDetails.revenue)}</strong></div>
-                  <div><p>Net Income</p><strong>{formatLargeNumber(stockDetails.net_income)}</strong></div>
-                  <div><p>EPS Growth</p><strong>{formatPercent(stockDetails.eps_growth)}</strong></div>
-                  <div><p>Operating Margin</p><strong>{formatPercent(stockDetails.operating_margin)}</strong></div>
-                  <div><p>Current Ratio</p><strong>{stockDetails.current_ratio ? stockDetails.current_ratio.toFixed(2) : 'N/A'}</strong></div>
-                  <div><p>Volume</p><strong>{stockDetails.volume ? stockDetails.volume.toLocaleString() : 'N/A'}</strong></div>
+                  <div><p>Revenue <HelpIcon text="Total money a company earns from selling its products or services before any expenses are deducted." /></p><strong>{formatLargeNumber(stockDetails.revenue)}</strong></div>
+                  <div><p>Net Income <HelpIcon text="A company's total profit after all expenses, taxes, and costs have been subtracted from revenue. Also called the 'bottom line'." /></p><strong>{formatLargeNumber(stockDetails.net_income)}</strong></div>
+                  <div><p>EPS Growth <HelpIcon text="Earnings Per Share growth. Shows how fast a company's profit per share is increasing. Higher growth often signals a company expanding its business." /></p><strong>{formatPercent(stockDetails.eps_growth)}</strong></div>
+                  <div><p>Operating Margin <HelpIcon text="Percentage of revenue remaining after paying operating costs (wages, materials, etc.). Higher margin = more efficient business." /></p><strong>{formatPercent(stockDetails.operating_margin)}</strong></div>
+                  <div><p>Current Ratio <HelpIcon text="Company's ability to pay short-term debts. Calculated as current assets ÷ current liabilities. Above 1.0 means the company can cover its near-term obligations." /></p><strong>{stockDetails.current_ratio ? stockDetails.current_ratio.toFixed(2) : 'N/A'}</strong></div>
+                  <div><p>Volume <HelpIcon text="Number of shares traded in a given period. Higher volume means more market interest and usually easier buying/selling (liquidity)." /></p><strong>{stockDetails.volume ? stockDetails.volume.toLocaleString() : 'N/A'}</strong></div>
                 </div>
               </article>
             </>

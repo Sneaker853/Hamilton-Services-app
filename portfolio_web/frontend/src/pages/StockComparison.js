@@ -77,11 +77,9 @@ const StockComparison = ({ apiBase }) => {
 
     if (!stockData[ticker]) {
       try {
-        const res = await axios.get(`${apiBase}/stocks/all`, { params: { page: 1, page_size: 500 } });
-        const stocks = res.data?.stocks || [];
-        const match = stocks.find((s) => s.ticker === ticker);
-        if (match) {
-          setStockData((prev) => ({ ...prev, [ticker]: match }));
+        const res = await axios.get(`${apiBase}/stocks/${encodeURIComponent(ticker)}`);
+        if (res.data) {
+          setStockData((prev) => ({ ...prev, [ticker]: res.data }));
         }
       } catch {
         // Data unavailable for this ticker

@@ -20,6 +20,7 @@ import {
   FiTrendingDown,
   FiTrendingUp,
 } from 'react-icons/fi';
+import { HelpIcon } from '../components';
 import './Dashboard.css';
 
 const PERIODS = [
@@ -289,7 +290,7 @@ const Dashboard = ({ apiBase }) => {
       <div className="dashboard-kpis-grid">
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>Total Portfolio Value</span>
+            <span>Total Portfolio Value <HelpIcon text="The estimated current value of all your saved portfolios combined, based on original investment plus expected gains." /></span>
             <FiDollarSign />
           </header>
           <strong>{formatCurrency(portfolioMetrics.totalCurrentValue)}</strong>
@@ -298,7 +299,7 @@ const Dashboard = ({ apiBase }) => {
 
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>Expected Gain/Loss</span>
+            <span>Expected Gain/Loss <HelpIcon text="Projected annual profit or loss across all your portfolios, based on the Fama-French 5-factor model's expected returns." /></span>
             {portfolioMetrics.totalGainLoss >= 0 ? <FiTrendingUp /> : <FiTrendingDown />}
           </header>
           <strong>{formatCurrency(portfolioMetrics.totalGainLoss)}</strong>
@@ -307,7 +308,7 @@ const Dashboard = ({ apiBase }) => {
 
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>Active Portfolios</span>
+            <span>Active Portfolios <HelpIcon text="Number of portfolios you've saved. Each portfolio is a collection of stocks, ETFs, or bonds with specific allocations." /></span>
             <FiBriefcase />
           </header>
           <strong>{portfolioMetrics.activeCount}</strong>
@@ -316,7 +317,7 @@ const Dashboard = ({ apiBase }) => {
 
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>vs S&P 500</span>
+            <span>vs S&P 500 <HelpIcon text="How your portfolios' expected return compares to the S&P 500's historical average of ~9% annually. Positive means outperforming the market benchmark." /></span>
             <FiBarChart2 />
           </header>
           <strong>{formatPercent(portfolioMetrics.avgExpectedReturn - 9, 1)}</strong>
@@ -397,9 +398,9 @@ const Dashboard = ({ apiBase }) => {
               <thead>
                 <tr>
                   <th>Asset</th>
-                  <th>Allocation</th>
+                  <th>Allocation <HelpIcon text="The percentage of your total portfolio value that this holding represents." /></th>
                   <th>Value</th>
-                  <th>Exp. Return</th>
+                  <th>Exp. Return <HelpIcon text="The annualized return expected for this stock based on factor models. Not a guarantee of future performance." /></th>
                 </tr>
               </thead>
               <tbody>
@@ -493,7 +494,7 @@ const Dashboard = ({ apiBase }) => {
                 <strong>{formatCurrency(item.investmentAmount)}</strong>
               </div>
               <div>
-                <p>Expected Return</p>
+                <p>Expected Return <HelpIcon text="Annualized expected return based on factor model analysis. Positive values suggest the portfolio is projected to grow." /></p>
                 <strong className={item.expectedReturnPct >= 0 ? 'positive' : 'negative'}>
                   {item.expectedReturnPct >= 0 ? '▲ ' : '▼ '}{formatPercent(item.expectedReturnPct, 1)}
                 </strong>

@@ -1,28 +1,48 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import './Tooltip.css';
 
 export const Tooltip = ({ text, children, position = 'top' }) => {
   const [visible, setVisible] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
   const [adjustedPosition, setAdjustedPosition] = useState(position);
-  const tipRef = useRef(null);
   const wrapRef = useRef(null);
 
   useEffect(() => {
-    if (visible && tipRef.current && wrapRef.current) {
-      const tipRect = tipRef.current.getBoundingClientRect();
-      const wrapRect = wrapRef.current.getBoundingClientRect();
+    if (visible && wrapRef.current) {
+      const rect = wrapRef.current.getBoundingClientRect();
+      const gap = 8;
+      let top, left, pos = position;
 
-      if (position === 'top' && tipRect.top < 8) {
-        setAdjustedPosition('bottom');
-      } else if (position === 'bottom' && tipRect.bottom > window.innerHeight - 8) {
-        setAdjustedPosition('top');
-      } else if (position === 'right' && tipRect.right > window.innerWidth - 8) {
-        setAdjustedPosition('left');
-      } else if (position === 'left' && tipRect.left < 8) {
-        setAdjustedPosition('right');
+      // Calculate initial position
+      if (pos === 'top') {
+        top = rect.top - gap;
+        left = rect.left + rect.width / 2;
+      } else if (pos === 'bottom') {
+        top = rect.bottom + gap;
+        left = rect.left + rect.width / 2;
+      } else if (pos === 'left') {
+        top = rect.top + rect.height / 2;
+        left = rect.left - gap;
       } else {
-        setAdjustedPosition(position);
+        top = rect.top + rect.height / 2;
+        left = rect.right + gap;
       }
+
+      // Flip if needed
+      if (pos === 'top' && rect.top < 80) pos = 'bottom';
+      if (pos === 'bottom' && rect.bottom > window.innerHeight - 80) pos = 'top';
+      if (pos === 'left' && rect.left < 280) pos = 'right';
+      if (pos === 'right' && rect.right > window.innerWidth - 280) pos = 'left';
+
+      // Recalculate after flip
+      if (pos === 'top') { top = rect.top - gap; left = rect.left + rect.width / 2; }
+      else if (pos === 'bottom') { top = rect.bottom + gap; left = rect.left + rect.width / 2; }
+      else if (pos === 'left') { top = rect.top + rect.height / 2; left = rect.left - gap; }
+      else { top = rect.top + rect.height / 2; left = rect.right + gap; }
+
+      setAdjustedPosition(pos);
+      setCoords({ top, left });
     }
   }, [visible, position]);
 
@@ -36,10 +56,15 @@ export const Tooltip = ({ text, children, position = 'top' }) => {
       onBlur={() => setVisible(false)}
     >
       {children}
-      {visible && (
-        <span className={`tooltip-bubble tooltip-${adjustedPosition}`} ref={tipRef} role="tooltip">
+      {visible && ReactDOM.createPortal(
+        <span
+          className={`tooltip-bubble tooltip-${adjustedPosition}`}
+          role="tooltip"
+          style={{ top: coords.top, left: coords.left }}
+        >
           {text}
-        </span>
+        </span>,
+        document.body
       )}
     </span>
   );

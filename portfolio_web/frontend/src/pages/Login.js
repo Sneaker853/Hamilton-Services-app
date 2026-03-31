@@ -149,6 +149,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
         }
 
         localStorage.setItem('authUser', JSON.stringify(user));
+        localStorage.removeItem('guestMode');
         if (mode === 'signup') {
           setInfoMessage('Account created. Please verify your email if required by your environment.');
         }

@@ -140,41 +140,43 @@ function AppContent() {
 
   useEffect(() => {
     const loadUser = async () => {
-      const guest = localStorage.getItem('guestMode') === 'true';
-      setGuestMode(guest);
-
-      if (guest) {
-        setAuthUser(null);
-        return;
-      }
-
+      // Check auth credentials BEFORE guestMode so logging in clears guest state
       const stored = localStorage.getItem('authUser');
       const csrfCookie = getCookieValue('portfolio_csrf_token');
-      if (!stored && !csrfCookie) {
-        setAuthUser(null);
-        return;
-      }
 
-      try {
-        const response = await axios.get(`${API_BASE}/auth/me`, { timeout: 5000, withCredentials: true });
-        const user = response?.data;
-        if (user?.email) {
-          setAuthUser(user);
-          localStorage.setItem('authUser', JSON.stringify(user));
-          return;
-        }
-      } catch (_err) {
-      }
-
-      if (stored) {
+      if (stored || csrfCookie) {
         try {
-          setAuthUser(JSON.parse(stored));
-        } catch (err) {
-          setAuthUser(null);
+          const response = await axios.get(`${API_BASE}/auth/me`, { timeout: 5000, withCredentials: true });
+          const user = response?.data;
+          if (user?.email) {
+            setAuthUser(user);
+            setGuestMode(false);
+            localStorage.setItem('authUser', JSON.stringify(user));
+            localStorage.removeItem('guestMode');
+            return;
+          }
+        } catch (_err) {
         }
-      } else {
-        setAuthUser(null);
+
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed?.email) {
+              setAuthUser(parsed);
+              setGuestMode(false);
+              localStorage.removeItem('guestMode');
+              return;
+            }
+          } catch (err) {
+            // corrupted stored user
+          }
+        }
       }
+
+      // No valid auth — check guest mode
+      const guest = localStorage.getItem('guestMode') === 'true';
+      setGuestMode(guest);
+      setAuthUser(null);
     };
 
     loadUser();
@@ -224,7 +226,10 @@ function AppContent() {
   }, [authUser]);
 
   if (!authUser && !guestMode) {
-    // Show landing page instead of auto-enabling guest mode
+    // Allow /login path through so Sign In works
+    if (location.pathname === '/login') {
+      return <Login apiBase={API_BASE} fullScreen />;
+    }
     return (
       <Landing
         onContinueAsGuest={() => {
