@@ -11,7 +11,8 @@ from db import get_cursor
 from cache_store import TTLCache
 from config import MARKET_DATA_CACHE_TTL_SECONDS
 from config import SESSION_COOKIE_NAME
-from security import require_admin_user, resolve_auth_token
+from security import require_admin_user, resolve_auth_token, get_user_from_token
+from schemas import WatchlistAddRequest, PriceAlertRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["market-data"])
@@ -576,3 +577,369 @@ async def get_stock_history(ticker: str, period: str = "1Y"):
     except Exception:
         logger.exception("Error fetching price history")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
+# Watchlist / Favorites
+# ---------------------------------------------------------------------------
+
+@router.get("/api/watchlist")
+async def get_watchlist(
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Get user's watchlist with current prices."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    with get_cursor(dict_cursor=True) as (_, cur):
+        cur.execute(
+            """
+            SELECT w.id, w.ticker, w.notes, w.added_at,
+                   s.name, s.sector, s.exchange, s.pe_ratio, s.beta,
+                   s.market_cap, s.dividend_yield
+            FROM user_watchlist w
+            LEFT JOIN stocks s ON s.ticker = w.ticker
+            WHERE w.user_id = %s
+            ORDER BY w.added_at DESC
+            """,
+            (user["id"],),
+        )
+        rows = cur.fetchall()
+
+        # Get latest prices for all watchlist tickers
+        tickers = [r["ticker"] for r in rows]
+        price_map = {}
+        if tickers:
+            cur.execute(
+                """
+                SELECT DISTINCT ON (ticker) ticker, close, date
+                FROM price_history
+                WHERE ticker = ANY(%s)
+                ORDER BY ticker, date DESC
+                """,
+                (tickers,),
+            )
+            for pr in cur.fetchall():
+                price_map[pr["ticker"]] = {
+                    "price": float(pr["close"]),
+                    "date": pr["date"].isoformat(),
+                }
+
+    items = []
+    for r in rows:
+        item = {
+            "id": r["id"],
+            "ticker": r["ticker"],
+            "name": r.get("name"),
+            "sector": r.get("sector"),
+            "exchange": r.get("exchange"),
+            "pe_ratio": float(r["pe_ratio"]) if r.get("pe_ratio") else None,
+            "beta": float(r["beta"]) if r.get("beta") else None,
+            "market_cap": float(r["market_cap"]) if r.get("market_cap") else None,
+            "dividend_yield": float(r["dividend_yield"]) if r.get("dividend_yield") else None,
+            "notes": r.get("notes"),
+            "added_at": r["added_at"].isoformat() if r.get("added_at") else None,
+        }
+        p = price_map.get(r["ticker"])
+        if p:
+            item["current_price"] = p["price"]
+            item["price_date"] = p["date"]
+        items.append(item)
+
+    return {"items": items, "count": len(items)}
+
+
+@router.post("/api/watchlist")
+async def add_to_watchlist(
+    req: WatchlistAddRequest,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Add a ticker to user's watchlist."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    ticker = req.ticker.upper().strip()
+
+    with get_cursor(dict_cursor=True) as (conn, cur):
+        # Check if ticker exists in stocks table
+        cur.execute("SELECT ticker FROM stocks WHERE ticker = %s", (ticker,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail=f"Ticker '{ticker}' not found")
+
+        # Watchlist limit per user (100 max)
+        cur.execute("SELECT COUNT(*) as cnt FROM user_watchlist WHERE user_id = %s", (user["id"],))
+        count = cur.fetchone()["cnt"]
+        if count >= 100:
+            raise HTTPException(status_code=400, detail="Watchlist limit reached (100 tickers)")
+
+        cur.execute(
+            """
+            INSERT INTO user_watchlist (user_id, ticker, notes)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (user_id, ticker) DO UPDATE SET notes = EXCLUDED.notes
+            RETURNING id, added_at
+            """,
+            (user["id"], ticker, req.notes),
+        )
+        row = cur.fetchone()
+        conn.commit()
+
+    return {
+        "id": row["id"],
+        "ticker": ticker,
+        "notes": req.notes,
+        "added_at": row["added_at"].isoformat(),
+    }
+
+
+@router.delete("/api/watchlist/{ticker}")
+async def remove_from_watchlist(
+    ticker: str,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Remove a ticker from user's watchlist."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    with get_cursor(dict_cursor=True) as (conn, cur):
+        cur.execute(
+            "DELETE FROM user_watchlist WHERE user_id = %s AND ticker = %s RETURNING id",
+            (user["id"], ticker.upper().strip()),
+        )
+        deleted = cur.fetchone()
+        conn.commit()
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Ticker not in watchlist")
+
+    return {"success": True, "ticker": ticker.upper()}
+
+
+# ---------------------------------------------------------------------------
+# Price Alerts
+# ---------------------------------------------------------------------------
+
+@router.get("/api/alerts")
+async def get_price_alerts(
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Get user's price alerts with current prices."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    with get_cursor(dict_cursor=True) as (_, cur):
+        cur.execute(
+            """SELECT id, ticker, condition, threshold, reference_price,
+                      is_active, is_triggered, triggered_at, created_at, notes
+               FROM price_alerts WHERE user_id = %s
+               ORDER BY created_at DESC""",
+            (user["id"],),
+        )
+        alerts = cur.fetchall()
+
+        tickers = list({a["ticker"] for a in alerts})
+        price_map = {}
+        if tickers:
+            cur.execute(
+                """SELECT DISTINCT ON (ticker) ticker, close, date
+                   FROM price_history WHERE ticker = ANY(%s)
+                   ORDER BY ticker, date DESC""",
+                (tickers,),
+            )
+            for pr in cur.fetchall():
+                price_map[pr["ticker"]] = {"price": float(pr["close"]), "date": pr["date"].isoformat()}
+
+    items = []
+    for a in alerts:
+        current = price_map.get(a["ticker"], {})
+        items.append({
+            "id": a["id"],
+            "ticker": a["ticker"],
+            "condition": a["condition"],
+            "threshold": a["threshold"],
+            "reference_price": a["reference_price"],
+            "current_price": current.get("price"),
+            "price_date": current.get("date"),
+            "is_active": a["is_active"],
+            "is_triggered": a["is_triggered"],
+            "triggered_at": a["triggered_at"].isoformat() if a["triggered_at"] else None,
+            "created_at": a["created_at"].isoformat(),
+            "notes": a["notes"] or "",
+        })
+
+    return {"items": items, "count": len(items)}
+
+
+@router.post("/api/alerts")
+async def create_price_alert(
+    body: PriceAlertRequest,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Create a new price alert."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    ticker = body.ticker.upper().strip()
+    if body.condition not in ("above", "below", "pct_change"):
+        raise HTTPException(status_code=400, detail="Invalid condition: must be above, below, or pct_change")
+
+    with get_cursor(dict_cursor=True) as (conn, cur):
+        # Validate ticker exists
+        cur.execute("SELECT ticker FROM stocks WHERE ticker = %s", (ticker,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail=f"Ticker '{ticker}' not found")
+
+        # Limit alerts per user
+        cur.execute("SELECT COUNT(*) AS cnt FROM price_alerts WHERE user_id = %s", (user["id"],))
+        if cur.fetchone()["cnt"] >= 50:
+            raise HTTPException(status_code=400, detail="Maximum 50 alerts allowed")
+
+        # Get current price as reference
+        cur.execute(
+            """SELECT close FROM price_history
+               WHERE ticker = %s ORDER BY date DESC LIMIT 1""",
+            (ticker,),
+        )
+        price_row = cur.fetchone()
+        reference_price = float(price_row["close"]) if price_row else None
+
+        cur.execute(
+            """INSERT INTO price_alerts (user_id, ticker, condition, threshold, reference_price, notes)
+               VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, created_at""",
+            (user["id"], ticker, body.condition, body.threshold, reference_price, body.notes or ""),
+        )
+        row = cur.fetchone()
+        conn.commit()
+
+    return {
+        "id": row["id"],
+        "ticker": ticker,
+        "condition": body.condition,
+        "threshold": body.threshold,
+        "reference_price": reference_price,
+        "created_at": row["created_at"].isoformat(),
+    }
+
+
+@router.delete("/api/alerts/{alert_id}")
+async def delete_price_alert(
+    alert_id: int,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Delete a price alert."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    with get_cursor(dict_cursor=True) as (conn, cur):
+        cur.execute(
+            "DELETE FROM price_alerts WHERE id = %s AND user_id = %s RETURNING id",
+            (alert_id, user["id"]),
+        )
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Alert not found")
+        conn.commit()
+
+    return {"success": True}
+
+
+@router.patch("/api/alerts/{alert_id}/toggle")
+async def toggle_price_alert(
+    alert_id: int,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Toggle a price alert active/inactive."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    with get_cursor(dict_cursor=True) as (conn, cur):
+        cur.execute(
+            """UPDATE price_alerts SET is_active = NOT is_active
+               WHERE id = %s AND user_id = %s
+               RETURNING id, is_active""",
+            (alert_id, user["id"]),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Alert not found")
+        conn.commit()
+
+    return {"id": row["id"], "is_active": row["is_active"]}
+
+
+@router.post("/api/alerts/check")
+async def check_price_alerts(
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Check all active alerts against current prices and mark triggered ones."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    with get_cursor(dict_cursor=True) as (conn, cur):
+        cur.execute(
+            """SELECT id, ticker, condition, threshold, reference_price
+               FROM price_alerts
+               WHERE user_id = %s AND is_active = TRUE AND is_triggered = FALSE""",
+            (user["id"],),
+        )
+        alerts = cur.fetchall()
+        if not alerts:
+            return {"triggered": [], "checked": 0}
+
+        tickers = list({a["ticker"] for a in alerts})
+        cur.execute(
+            """SELECT DISTINCT ON (ticker) ticker, close
+               FROM price_history WHERE ticker = ANY(%s)
+               ORDER BY ticker, date DESC""",
+            (tickers,),
+        )
+        prices = {r["ticker"]: float(r["close"]) for r in cur.fetchall()}
+
+        triggered = []
+        for a in alerts:
+            current_price = prices.get(a["ticker"])
+            if current_price is None:
+                continue
+
+            fire = False
+            if a["condition"] == "above" and current_price >= a["threshold"]:
+                fire = True
+            elif a["condition"] == "below" and current_price <= a["threshold"]:
+                fire = True
+            elif a["condition"] == "pct_change" and a["reference_price"]:
+                pct = abs((current_price - a["reference_price"]) / a["reference_price"]) * 100
+                if pct >= a["threshold"]:
+                    fire = True
+
+            if fire:
+                cur.execute(
+                    """UPDATE price_alerts SET is_triggered = TRUE, triggered_at = NOW()
+                       WHERE id = %s""",
+                    (a["id"],),
+                )
+                triggered.append({
+                    "id": a["id"],
+                    "ticker": a["ticker"],
+                    "condition": a["condition"],
+                    "threshold": a["threshold"],
+                    "current_price": current_price,
+                })
+
+        conn.commit()
+
+    return {"triggered": triggered, "checked": len(alerts)}

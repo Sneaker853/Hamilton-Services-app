@@ -1,0 +1,236 @@
+.watchlist-root .wl-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.watchlist-root .wl-icon-accent {
+  color: #fbbf24;
+}
+
+.watchlist-root .wl-subtitle {
+  color: #94a3b8;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.watchlist-root .wl-message {
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgba(6, 182, 212, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  color: #22d3ee;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.watchlist-root .wl-error {
+  color: #f87171;
+  font-size: 14px;
+}
+
+.watchlist-root .wl-add-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.watchlist-root .wl-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.watchlist-root .wl-search-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.watchlist-root .wl-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+}
+
+.watchlist-root .wl-search-input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  border-radius: 8px;
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.watchlist-root .wl-search-input:focus {
+  outline: none;
+  border-color: rgba(34, 211, 238, 0.5);
+}
+
+.watchlist-root .wl-search-results {
+  margin-top: 8px;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.watchlist-root .wl-search-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(100, 116, 139, 0.1);
+}
+
+.watchlist-root .wl-search-item:last-child {
+  border-bottom: none;
+}
+
+.watchlist-root .wl-search-ticker {
+  font-weight: 700;
+  color: #22d3ee;
+  min-width: 60px;
+}
+
+.watchlist-root .wl-search-name {
+  flex: 1;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.watchlist-root .wl-search-sector {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.watchlist-root .wl-add-btn {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 6px;
+  color: #22c55e;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.watchlist-root .wl-add-btn:hover {
+  background: rgba(34, 197, 94, 0.25);
+}
+
+.watchlist-root .wl-muted {
+  color: #64748b;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.watchlist-root .wl-empty {
+  color: #94a3b8;
+  font-size: 14px;
+  text-align: center;
+  padding: 24px;
+}
+
+.watchlist-root .wl-table-wrap {
+  overflow-x: auto;
+}
+
+.watchlist-root .wl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.watchlist-root .wl-table th {
+  text-align: left;
+  padding: 8px 10px;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.watchlist-root .wl-table td {
+  padding: 10px;
+  border-bottom: 1px solid rgba(100, 116, 139, 0.08);
+  color: #cbd5e1;
+}
+
+.watchlist-root .wl-ticker {
+  font-weight: 700;
+  color: #22d3ee;
+}
+
+.watchlist-root .wl-date {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.watchlist-root .wl-remove-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #ef4444;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.watchlist-root .wl-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+@media (max-width: 700px) {
+  .watchlist-root .wl-table thead {
+    display: none;
+  }
+
+  .watchlist-root .wl-table,
+  .watchlist-root .wl-table tbody {
+    display: block;
+  }
+
+  .watchlist-root .wl-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    padding: 12px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(100, 116, 139, 0.15);
+    border-radius: 10px;
+    background: rgba(19, 26, 46, 0.5);
+  }
+
+  .watchlist-root .wl-table td {
+    padding: 2px 0;
+    border: none;
+  }
+
+  .watchlist-root .wl-table td::before {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 1px;
+  }
+
+  .watchlist-root .wl-table td:nth-child(1)::before { content: 'Ticker'; }
+  .watchlist-root .wl-table td:nth-child(2)::before { content: 'Name'; }
+  .watchlist-root .wl-table td:nth-child(3)::before { content: 'Sector'; }
+  .watchlist-root .wl-table td:nth-child(4)::before { content: 'Price'; }
+  .watchlist-root .wl-table td:nth-child(5)::before { content: 'P/E'; }
+  .watchlist-root .wl-table td:nth-child(6)::before { content: 'Beta'; }
+  .watchlist-root .wl-table td:nth-child(7)::before { content: 'Yield'; }
+  .watchlist-root .wl-table td:nth-child(8)::before { content: 'Added'; }
+}

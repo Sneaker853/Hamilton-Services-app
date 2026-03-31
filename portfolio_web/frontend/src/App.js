@@ -6,8 +6,10 @@ import logoPlaceholder from './assets/hamilton-services-logo-notext.png';
 import {
   FiActivity,
   FiBarChart2,
+  FiBell,
   FiBriefcase,
   FiColumns,
+  FiCrosshair,
   FiGrid,
   FiHelpCircle,
   FiInfo,
@@ -18,6 +20,8 @@ import {
   FiMenu,
   FiSettings,
   FiShield,
+  FiStar,
+  FiTrendingUp,
   FiX,
 } from 'react-icons/fi';
 import { RiScales3Line } from 'react-icons/ri';
@@ -39,6 +43,10 @@ import PortfolioComparison from './pages/PortfolioComparison';
 import StockComparison from './pages/StockComparison';
 import HelpDocs from './pages/HelpDocs';
 import SharedPortfolio from './pages/SharedPortfolio';
+import Watchlist from './pages/Watchlist';
+import Alerts from './pages/Alerts';
+import PerformanceDashboard from './pages/PerformanceDashboard';
+import Goals from './pages/Goals';
 import Landing from './pages/Landing';
 import KeyboardShortcuts from './components/KeyboardShortcuts';
 import OnboardingWizard from './components/OnboardingWizard';
@@ -213,6 +221,10 @@ function AppContent() {
     { path: '/market-data', label: 'Market Data', icon: FiBarChart2 },
     { path: '/compare', label: 'Compare', icon: FiColumns },
     { path: '/compare-stocks', label: 'Stocks', icon: RiScales3Line },
+    { path: '/watchlist', label: 'Watchlist', icon: FiStar, requiresAuth: true },
+    { path: '/alerts', label: 'Alerts', icon: FiBell, requiresAuth: true },
+    { path: '/performance', label: 'Performance', icon: FiTrendingUp, requiresAuth: true },
+    { path: '/goals', label: 'Goals', icon: FiCrosshair, requiresAuth: true },
     { path: '/help', label: 'Help', icon: FiHelpCircle },
     { path: '/mission', label: 'Mission', icon: FiInfo },
     { path: '/contact', label: 'Contact', icon: FiMail },
@@ -390,6 +402,10 @@ function AppContent() {
           <Route path="/market-data" element={<MarketData apiBase={API_BASE} />} />
           <Route path="/compare" element={<PortfolioComparison apiBase={API_BASE} />} />
           <Route path="/compare-stocks" element={<StockComparison apiBase={API_BASE} />} />
+          <Route path="/watchlist" element={authUser ? <Watchlist apiBase={API_BASE} /> : <Navigate to="/login" replace />} />
+          <Route path="/alerts" element={authUser ? <Alerts apiBase={API_BASE} /> : <Navigate to="/login" replace />} />
+          <Route path="/performance" element={authUser ? <PerformanceDashboard apiBase={API_BASE} /> : <Navigate to="/login" replace />} />
+          <Route path="/goals" element={authUser ? <Goals apiBase={API_BASE} /> : <Navigate to="/login" replace />} />
           <Route path="/help" element={<HelpDocs />} />
           <Route path="/shared/:shareToken" element={<SharedPortfolio apiBase={API_BASE} />} />
           <Route path="/mission" element={<Mission />} />

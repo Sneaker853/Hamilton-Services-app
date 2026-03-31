@@ -128,7 +128,84 @@ def load_mean_returns_and_covariance(
         shrinkage_delta = 0.20
         cov_matrix = (1.0 - shrinkage_delta) * cov_matrix + shrinkage_delta * diag_cov
 
+    # ------------------------------------------------------------------
+    # Factor-based risk model overlay: Cov = B * Cov_f * B' + D_residual
+    # Uses FF5 betas from asset_metrics to decompose risk into systematic
+    # (factor) and idiosyncratic components. Blended 50/50 with
+    # statistical covariance for robustness.
+    # ------------------------------------------------------------------
+    try:
+        factor_cov = _build_factor_risk_model(aligned_tickers, returns_df)
+        if factor_cov is not None:
+            cov_matrix = 0.5 * cov_matrix + 0.5 * factor_cov
+    except Exception:
+        pass  # fall back to statistical covariance only
+
     return aligned_tickers, mean_returns, cov_matrix
+
+
+def _build_factor_risk_model(
+    tickers: List[str], returns_df: pd.DataFrame
+) -> np.ndarray | None:
+    """Build factor-based covariance: B * Cov_factors * B' + Diag(residual_var).
+
+    Uses FF5 factor betas from asset_metrics table. Returns annualised
+    covariance matrix or None if insufficient data.
+    """
+    with get_cursor(dict_cursor=True) as (_, cur):
+        cur.execute(
+            """SELECT ticker, beta_mkt, beta_smb, beta_hml, beta_rmw, beta_cma
+               FROM asset_metrics WHERE ticker = ANY(%s)""",
+            (tickers,),
+        )
+        rows = cur.fetchall()
+
+    if len(rows) < len(tickers) * 0.7:
+        return None  # too many tickers missing betas
+
+    betas_df = pd.DataFrame(rows).set_index("ticker")
+    factor_cols = ["beta_mkt", "beta_smb", "beta_hml", "beta_rmw", "beta_cma"]
+
+    # Align betas to ticker order, fill missing with zeros
+    B = np.zeros((len(tickers), len(factor_cols)))
+    for i, t in enumerate(tickers):
+        if t in betas_df.index:
+            row = betas_df.loc[t, factor_cols]
+            for j, col in enumerate(factor_cols):
+                val = row[col] if not isinstance(row, pd.Series) or col == col else row[col]
+                B[i, j] = float(val) if val is not None and np.isfinite(float(val)) else 0.0
+
+    # Estimate factor covariance from returns
+    # Use returns residuals to estimate idiosyncratic variance
+    returns_arr = returns_df[tickers].values  # T x N
+    T = returns_arr.shape[0]
+
+    # Approximate factor returns via cross-sectional regression
+    # F_hat = (B'B)^-1 B' R' — OLS factor mimicking
+    BtB = B.T @ B
+    if np.linalg.matrix_rank(BtB) < len(factor_cols):
+        return None
+
+    BtB_inv = np.linalg.inv(BtB + 1e-8 * np.eye(len(factor_cols)))
+    factor_returns = (BtB_inv @ B.T @ returns_arr.T).T  # T x K
+
+    cov_factors = np.cov(factor_returns, rowvar=False)  # K x K (daily)
+
+    # Residual (idiosyncratic) variance
+    fitted = (B @ factor_returns.T).T  # T x N
+    residuals = returns_arr - fitted
+    residual_var = np.var(residuals, axis=0, ddof=1)  # N-vector
+
+    # Factor covariance: B * Cov_f * B' + Diag(residual_var), annualised
+    factor_cov = B @ cov_factors @ B.T * 252
+    np.fill_diagonal(factor_cov, np.diag(factor_cov) + residual_var * 252)
+
+    # Ensure positive semi-definite
+    eigvals = np.linalg.eigvalsh(factor_cov)
+    if eigvals.min() < 0:
+        factor_cov += (-eigvals.min() + 1e-8) * np.eye(len(tickers))
+
+    return factor_cov
 
 
 # ---------------------------------------------------------------------------

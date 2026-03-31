@@ -34,7 +34,7 @@
 
 ---
 
-## Phase 2 — Financial Model Corrections (14/18 complete ✓)
+## Phase 2 — Financial Model Corrections (16/18 complete ✓)
 
 ### Backtesting (Grade: D — Most Critical)
 - [x] Implement walk-forward backtesting — re-estimate metrics at each rebalance using only past data (removes 100-300 bps look-ahead bias)
@@ -60,8 +60,8 @@
 ### New Professional Metrics
 - [x] Add portfolio-level FF5 factor attribution — aggregate individual stock betas into portfolio factor exposures
 - [x] Add Value-at-Risk (VaR) and Expected Shortfall metrics
-- [ ] Add Brinson-Fachler performance attribution (allocation effect vs. selection effect)
-- [ ] Add style analysis (large/small, value/growth regression)
+- [x] Add Brinson-Fachler performance attribution (allocation effect vs. selection effect)
+- [x] Add style analysis (large/small, value/growth regression)
 
 ---
 
@@ -77,8 +77,8 @@
 ### Core Missing Features
 - [x] Add CSV/PDF export for portfolios and analytics data
 - [x] Add portfolio comparison view — side-by-side metrics for 2+ saved portfolios
-- [ ] Add watchlist/favorites — save stocks for monitoring
-- [ ] Add progress bars for long operations (portfolio generation, admin updates) with ETA
+- [x] Add watchlist/favorites — save stocks for monitoring
+- [x] Add progress bars for long operations (portfolio generation, admin updates) with ETA
 
 ### UX Improvements
 - [x] Add persona descriptions in Portfolio Generator explaining risk/return expectations
@@ -91,7 +91,7 @@
 
 ### Mobile & Accessibility
 - [x] Improve mobile table layouts — stack rows vertically or add collapsible detail rows
-- [ ] Add touch-friendly alternatives for drag-drop holdings on mobile
+- [x] Add touch-friendly alternatives for drag-drop holdings on mobile
 - [x] Add screen reader descriptions for charts (alt text on Recharts)
 - [x] Add skip-to-main-content link for keyboard navigation
 - [x] Add `aria-invalid` and error linking on form validation
@@ -102,15 +102,15 @@
 ## Phase 4 — Professional-Grade Enhancements
 
 ### Financial Engine
-- [ ] Add GARCH(1,1) volatility model (replaces EWMA — 15% lower forecast error)
-- [ ] Add factor-based risk model (`Cov = β Cov_factors β' + Σ_residuals`) alongside statistical covariance
+- [x] Add GARCH(1,1) volatility model (replaces EWMA — 15% lower forecast error)
+- [x] Add factor-based risk model (`Cov = β Cov_factors β' + Σ_residuals`) alongside statistical covariance
 - [ ] Add tax-loss harvesting engine (wash-sale rule awareness, cost basis tracking)
 - [ ] Add multi-period optimization (CVXPY stochastic programming)
-- [ ] Add ESG constraints (min ESG score, carbon footprint limits)
+- [x] Add ESG constraints (min ESG score, carbon footprint limits)
 - [x] Add liquidity constraints (max % of 20-day volume per position)
 - [x] Calibrate stress test scenarios to historical events (2008, COVID, Taper Tantrum)
 - [x] Add predictive drift monitoring — forecast 30-day drift and rebalance urgency
-- [ ] Add smart rebalancing calendar with ex-dividend date avoidance
+- [x] Add smart rebalancing calendar with ex-dividend date avoidance
 
 ### Infrastructure & Scalability
 - [ ] Migrate to Redis-backed caching (distributed cache across containers)
@@ -127,10 +127,10 @@
 - [x] Sanitize URL paths in logs — strip query parameters containing tokens
 
 ### Nice-to-Have Features
-- [ ] Add price alerts / notifications system
+- [x] Add price alerts / notifications system
 - [x] Add portfolio sharing (read-only link)
-- [ ] Add personal performance dashboard — actual returns vs. projections over time
-- [ ] Add goals & targets — allocation goals with auto-rebalancing suggestions
+- [x] Add personal performance dashboard — actual returns vs. projections over time
+- [x] Add goals & targets — allocation goals with auto-rebalancing suggestions
 - [x] Add password strength indicator with real-time feedback
 - [x] Add ticker autocomplete/suggestions in Market Data search
 - [x] Add stock comparison — side-by-side view for 2+ tickers
@@ -143,7 +143,7 @@
 | Phase | Total | Done | Remaining |
 |-------|-------|------|-----------|
 | Phase 1 — Critical Fixes | 17 | 17 | 0 |
-| Phase 2 — Financial Model | 18 | 14 | 4 |
-| Phase 3 — UX & Features | 20 | 18 | 2 |
-| Phase 4 — Professional | 30 | 17 | 13 |
-| **Total** | **85** | **66** | **19** |
+| Phase 2 — Financial Model | 18 | 16 | 2 |
+| Phase 3 — UX & Features | 20 | 20 | 0 |
+| Phase 4 — Professional | 30 | 19 | 11 |
+| **Total** | **85** | **72** | **13** |

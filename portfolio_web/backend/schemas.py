@@ -48,6 +48,8 @@ class OptimizeWeightsRequest(BaseModel):
     cost_bps: float = Field(0.0, ge=0, le=200, description="Trading cost in basis points per unit turnover")
     max_volume_pct: Optional[float] = Field(None, gt=0, le=100, description="Max position as % of 20-day avg volume (liquidity constraint)")
     portfolio_value: Optional[float] = Field(None, gt=0, description="Total portfolio value in USD (needed for liquidity constraint)")
+    min_esg_score: Optional[float] = Field(None, ge=0, le=100, description="Minimum ESG score (0-100) for included positions")
+    max_carbon_intensity: Optional[float] = Field(None, gt=0, description="Maximum carbon intensity per position (tonnes CO2/$M revenue)")
 
 
 class CovarianceMetricHolding(BaseModel):
@@ -163,3 +165,22 @@ class SavedPortfolioResponse(BaseModel):
     source: str
     created_at: datetime
     data: Dict
+
+
+class WatchlistAddRequest(BaseModel):
+    ticker: str = Field(..., min_length=1, max_length=10, description="Stock ticker to add to watchlist")
+    notes: Optional[str] = Field(None, max_length=500, description="Optional notes about the ticker")
+
+
+class PriceAlertRequest(BaseModel):
+    ticker: str = Field(..., min_length=1, max_length=10, description="Stock ticker to monitor")
+    condition: str = Field(..., description="Alert condition: above, below, or pct_change")
+    threshold: float = Field(..., description="Price threshold or % change (e.g. 150.0 or 5.0 for 5%)")
+    notes: Optional[str] = Field(None, max_length=500, description="Optional notes")
+
+
+class PortfolioGoalRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255, description="Goal name")
+    portfolio_id: Optional[int] = Field(None, description="Linked saved portfolio ID")
+    target_allocations: Dict[str, float] = Field(..., description="Target weights by ticker, in percent (e.g. {'AAPL': 25})")
+    rebalance_threshold: float = Field(5.0, gt=0, le=50, description="Drift threshold to trigger rebalancing")

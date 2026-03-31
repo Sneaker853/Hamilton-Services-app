@@ -31,6 +31,7 @@ from schemas import (
     RiskDecompositionRequest,
     DriftMonitorRequest,
     AnalyzePortfolioRequest,
+    PortfolioGoalRequest,
 )
 from security import get_user_from_token, resolve_auth_token, write_audit_log
 from services import get_config_manager, get_portfolio_builder
@@ -627,6 +628,37 @@ async def optimize_weights(request: OptimizeWeightsRequest):
                     bounds_list[i] = (lo, min(hi, max_weight))
             bounds = tuple(bounds_list)
 
+        # ---- ESG constraints: min ESG score and/or max carbon intensity ----
+        esg_excluded = set()
+        if request.min_esg_score is not None or request.max_carbon_intensity is not None:
+            with get_cursor(dict_cursor=True) as (_, cur):
+                cur.execute(
+                    "SELECT ticker, esg_score, carbon_intensity FROM stocks WHERE ticker = ANY(%s)",
+                    (aligned_tickers,),
+                )
+                esg_rows = cur.fetchall()
+
+            esg_map = {r["ticker"]: r for r in esg_rows}
+
+            bounds_list = list(bounds)
+            for i, t in enumerate(aligned_tickers):
+                esg = esg_map.get(t, {})
+                score = esg.get("esg_score")
+                carbon = esg.get("carbon_intensity")
+
+                excluded = False
+                if request.min_esg_score is not None:
+                    if score is None or float(score) < request.min_esg_score:
+                        excluded = True
+                if request.max_carbon_intensity is not None:
+                    if carbon is not None and float(carbon) > request.max_carbon_intensity:
+                        excluded = True
+
+                if excluded:
+                    bounds_list[i] = (0.0, 0.0)  # force weight to zero
+                    esg_excluded.add(t)
+            bounds = tuple(bounds_list)
+
         # Warm-start: use previous weights if available, else equal-weight
         initial_weights = np.array([1.0 / len(aligned_tickers)] * len(aligned_tickers))
         if prev_total > 0:
@@ -732,6 +764,9 @@ async def optimize_weights(request: OptimizeWeightsRequest):
                 "hhi_penalty_lambda": hhi_lambda,
                 "cost_bps": cost_bps,
                 "max_volume_pct": float(request.max_volume_pct) if request.max_volume_pct is not None else None,
+                "min_esg_score": float(request.min_esg_score) if request.min_esg_score is not None else None,
+                "max_carbon_intensity": float(request.max_carbon_intensity) if request.max_carbon_intensity is not None else None,
+                "esg_excluded_tickers": sorted(esg_excluded) if esg_excluded else [],
             },
         }
     except HTTPException:
@@ -1917,3 +1952,766 @@ async def var_cvar(req: CovarianceMetricsRequest):
     except Exception:
         logger.exception("Error computing VaR/CVaR")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Returns-based Style Analysis (Large/Small, Value/Growth)
+# ---------------------------------------------------------------------------
+
+@router.post("/api/portfolio/style-analysis")
+async def style_analysis(req: RiskDecompositionRequest):
+    """
+    Sharpe returns-based style analysis.  Regresses portfolio returns
+    against size (SMB) and value (HML) FF5 factor betas to classify
+    the portfolio along Large/Small and Value/Growth dimensions.
+    Also provides per-asset style classification.
+    """
+    try:
+        tickers = [h.ticker.upper() for h in req.holdings]
+        weights_raw = np.array([h.weight for h in req.holdings], dtype=float)
+        w_sum = weights_raw.sum()
+        if w_sum <= 0:
+            raise HTTPException(status_code=400, detail="Weights must sum to a positive number")
+        weights = weights_raw / w_sum
+
+        # Load FF5 betas from asset_metrics
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                """
+                SELECT ticker, beta_smb, beta_hml, beta_mkt, market_cap,
+                       pe_ratio, expected_return, volatility
+                FROM asset_metrics am
+                LEFT JOIN stocks s ON s.ticker = am.ticker
+                WHERE am.ticker = ANY(%s)
+                """,
+                (tickers,),
+            )
+            rows = cur.fetchall()
+
+        metric_map = {r["ticker"]: r for r in rows}
+
+        # Per-asset style classification
+        asset_styles = []
+        port_smb = 0.0
+        port_hml = 0.0
+        port_mkt = 0.0
+
+        for i, t in enumerate(tickers):
+            m = metric_map.get(t, {})
+            smb = float(m.get("beta_smb") or 0.0)
+            hml = float(m.get("beta_hml") or 0.0)
+            mkt = float(m.get("beta_mkt") or 1.0)
+
+            port_smb += weights[i] * smb
+            port_hml += weights[i] * hml
+            port_mkt += weights[i] * mkt
+
+            # Classify individual stock
+            size_label = "Small" if smb > 0.15 else ("Large" if smb < -0.15 else "Mid")
+            value_label = "Value" if hml > 0.15 else ("Growth" if hml < -0.15 else "Blend")
+
+            asset_styles.append({
+                "ticker": t,
+                "weight": round(float(weights[i]), 6),
+                "beta_smb": round(smb, 4),
+                "beta_hml": round(hml, 4),
+                "size": size_label,
+                "value_growth": value_label,
+                "style": f"{size_label} {value_label}",
+            })
+
+        # Portfolio-level style
+        port_size = "Small" if port_smb > 0.1 else ("Large" if port_smb < -0.1 else "Mid")
+        port_vg = "Value" if port_hml > 0.1 else ("Growth" if port_hml < -0.1 else "Blend")
+
+        # Style composition percentages
+        style_counts = {}
+        for a in asset_styles:
+            s = a["style"]
+            style_counts[s] = style_counts.get(s, 0.0) + a["weight"]
+
+        style_composition = [
+            {"style": name, "weight_pct": round(w * 100, 2)}
+            for name, w in sorted(style_counts.items(), key=lambda x: -x[1])
+        ]
+
+        return {
+            "n_assets": len(tickers),
+            "tickers_missing_metrics": [t for t in tickers if t not in metric_map],
+            "portfolio_style": {
+                "size": port_size,
+                "value_growth": port_vg,
+                "label": f"{port_size} {port_vg}",
+                "beta_smb": round(port_smb, 4),
+                "beta_hml": round(port_hml, 4),
+                "beta_mkt": round(port_mkt, 4),
+            },
+            "style_composition": style_composition,
+            "assets": asset_styles,
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error computing style analysis")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Brinson-Fachler Performance Attribution
+# ---------------------------------------------------------------------------
+
+@router.post("/api/portfolio/brinson-attribution")
+async def brinson_attribution(req: BenchmarkAnalyticsRequest):
+    """
+    Brinson-Fachler performance attribution: decomposes active return into
+    allocation effect, selection effect, and interaction effect by sector.
+
+    Requires:
+    - Portfolio holdings with weights and an implied period
+    - Benchmark ticker (default SPY) used to derive sector returns
+    """
+    try:
+        tickers = [h.ticker.upper() for h in req.holdings]
+        weights_raw = np.array([h.weight for h in req.holdings], dtype=float)
+        w_sum = weights_raw.sum()
+        if w_sum <= 0:
+            raise HTTPException(status_code=400, detail="Weights must sum to a positive number")
+        weights = weights_raw / w_sum
+
+        period = getattr(req, "period", "1Y") or "1Y"
+        period_days = {"1M": 30, "3M": 90, "6M": 180, "1Y": 365, "2Y": 730}.get(period, 365)
+
+        # Load sector assignments for portfolio tickers
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                "SELECT ticker, sector FROM stocks WHERE ticker = ANY(%s)",
+                (tickers,),
+            )
+            rows = cur.fetchall()
+
+        sector_map = {r["ticker"]: r["sector"] or "Other" for r in rows}
+
+        # Fetch portfolio ticker prices
+        prices, missing = _fetch_price_matrix(tickers, period_days)
+        if prices.empty or prices.shape[0] < 10:
+            raise HTTPException(status_code=422, detail="Insufficient price history for attribution")
+
+        present = [t for t in tickers if t in prices.columns]
+        if not present:
+            raise HTTPException(status_code=422, detail="No matching tickers in price history")
+
+        # Fetch benchmark prices
+        bm_ticker = getattr(req, "benchmark_ticker", "SPY") or "SPY"
+        bm_prices, _ = _fetch_price_matrix([bm_ticker], period_days)
+        if bm_prices.empty or bm_ticker not in bm_prices.columns:
+            raise HTTPException(status_code=422, detail=f"No price data for benchmark {bm_ticker}")
+
+        # Compute total-period returns per ticker
+        ticker_returns = {}
+        for t in present:
+            first_p = float(prices[t].dropna().iloc[0])
+            last_p = float(prices[t].dropna().iloc[-1])
+            ticker_returns[t] = (last_p / first_p - 1.0) if first_p > 0 else 0.0
+
+        bm_total_return = float(
+            bm_prices[bm_ticker].dropna().iloc[-1] / bm_prices[bm_ticker].dropna().iloc[0] - 1.0
+        )
+
+        # --- Group by sector ---
+        # Portfolio: weight and return per sector
+        sector_data = {}
+        for i, t in enumerate(tickers):
+            sec = sector_map.get(t, "Other")
+            if sec not in sector_data:
+                sector_data[sec] = {"port_weight": 0.0, "port_weighted_return": 0.0}
+            sector_data[sec]["port_weight"] += float(weights[i])
+            ret = ticker_returns.get(t, 0.0)
+            sector_data[sec]["port_weighted_return"] += float(weights[i]) * ret
+
+        # Compute portfolio sector returns
+        for sec in sector_data:
+            pw = sector_data[sec]["port_weight"]
+            sector_data[sec]["port_return"] = (
+                sector_data[sec]["port_weighted_return"] / pw if pw > 0 else 0.0
+            )
+
+        # Use S&P 500 sector weights as benchmark sector weights
+        # (approximate GICS weights — updated periodically)
+        sp500_sector_weights = {
+            "Technology": 0.30, "Healthcare": 0.13, "Financials": 0.13,
+            "Consumer Cyclical": 0.10, "Communication Services": 0.09,
+            "Industrials": 0.08, "Consumer Defensive": 0.06,
+            "Energy": 0.04, "Utilities": 0.03, "Real Estate": 0.02,
+            "Basic Materials": 0.02,
+        }
+        # Ensure all portfolio sectors have a benchmark weight
+        all_sectors = set(sector_data.keys())
+        total_bm_w = sum(sp500_sector_weights.get(s, 0.0) for s in all_sectors)
+        # For sectors not in S&P map, assign equal share of residual
+        unmapped = [s for s in all_sectors if s not in sp500_sector_weights]
+        residual = max(0.0, 1.0 - total_bm_w)
+        for s in unmapped:
+            sp500_sector_weights[s] = residual / len(unmapped) if unmapped else 0.0
+
+        # Normalise benchmark weights to portfolio's sector universe
+        bm_weights = {s: sp500_sector_weights.get(s, 0.0) for s in all_sectors}
+        bm_sum = sum(bm_weights.values())
+        if bm_sum > 0:
+            bm_weights = {s: w / bm_sum for s, w in bm_weights.items()}
+
+        # Benchmark sector return → use benchmark total return for all sectors
+        # (single-index approach since we don't have sector ETF prices)
+        bm_sector_return = bm_total_return
+
+        # --- Brinson-Fachler decomposition ---
+        total_port_return = sum(
+            sector_data[s]["port_weight"] * sector_data[s]["port_return"]
+            for s in sector_data
+        )
+
+        sectors_detail = []
+        total_allocation = 0.0
+        total_selection = 0.0
+        total_interaction = 0.0
+
+        for sec in sorted(all_sectors):
+            wp = sector_data[sec]["port_weight"]
+            wb = bm_weights.get(sec, 0.0)
+            rp = sector_data[sec]["port_return"]
+            rb = bm_sector_return  # benchmark sector return
+
+            # Brinson-Fachler formulas
+            allocation = (wp - wb) * (rb - bm_total_return)
+            selection = wb * (rp - rb)
+            interaction = (wp - wb) * (rp - rb)
+
+            total_allocation += allocation
+            total_selection += selection
+            total_interaction += interaction
+
+            sectors_detail.append({
+                "sector": sec,
+                "port_weight_pct": round(wp * 100, 2),
+                "bench_weight_pct": round(wb * 100, 2),
+                "port_return_pct": round(rp * 100, 4),
+                "bench_return_pct": round(rb * 100, 4),
+                "allocation_pct": round(allocation * 100, 4),
+                "selection_pct": round(selection * 100, 4),
+                "interaction_pct": round(interaction * 100, 4),
+            })
+
+        active_return = total_port_return - bm_total_return
+
+        return {
+            "period": period,
+            "benchmark": bm_ticker,
+            "n_assets": len(tickers),
+            "tickers_missing": missing,
+            "portfolio_return_pct": round(total_port_return * 100, 4),
+            "benchmark_return_pct": round(bm_total_return * 100, 4),
+            "active_return_pct": round(active_return * 100, 4),
+            "total_allocation_pct": round(total_allocation * 100, 4),
+            "total_selection_pct": round(total_selection * 100, 4),
+            "total_interaction_pct": round(total_interaction * 100, 4),
+            "sectors": sectors_detail,
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error computing Brinson-Fachler attribution")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Smart Rebalancing Calendar (ex-dividend date avoidance)
+# ---------------------------------------------------------------------------
+
+@router.post("/api/portfolio/smart-rebalance-calendar")
+async def smart_rebalance_calendar(req: DriftMonitorRequest):
+    """
+    Generate a smart rebalancing calendar for the next 90 days.
+    Avoids rebalancing near estimated ex-dividend dates (±2 business days)
+    and weekends. Suggests optimal rebalance windows.
+    """
+    try:
+        tickers = [h.ticker.upper() for h in req.holdings]
+        if not tickers:
+            raise HTTPException(status_code=400, detail="No tickers provided")
+
+        # Fetch dividend yields to estimate ex-div frequency
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                "SELECT ticker, dividend_yield FROM stocks WHERE ticker = ANY(%s)",
+                (tickers,),
+            )
+            rows = cur.fetchall()
+
+        div_map = {r["ticker"]: float(r["dividend_yield"] or 0.0) for r in rows}
+        dividend_payers = [t for t in tickers if div_map.get(t, 0.0) > 0.005]
+
+        # Generate business days for next 90 days
+        from datetime import timedelta
+        today = datetime.utcnow().date()
+        cal_days = []
+        d = today
+        for _ in range(130):  # generate ~90 business days
+            d += timedelta(days=1)
+            if d.weekday() < 5:  # Mon-Fri
+                cal_days.append(d)
+            if len(cal_days) >= 90:
+                break
+
+        # Estimate ex-dividend dates: most US stocks go ex-div quarterly
+        # Common months: Mar/Jun/Sep/Dec (for Q1-Q4) and Jan/Apr/Jul/Oct
+        # Approximate: stocks typically go ex-div in the 2nd-3rd week of
+        # quarterly months. We mark ±2 business days around mid-month of
+        # quarter-end months as ex-div risk windows.
+        quarter_months = {3, 6, 9, 12}  # standard quarterly
+        alt_quarter_months = {1, 4, 7, 10}  # alt quarterly cycle
+        ex_div_risk_dates = set()
+
+        for bd in cal_days:
+            # Mark mid-month of quarterly months as potential ex-div periods
+            if bd.month in quarter_months and 10 <= bd.day <= 22:
+                ex_div_risk_dates.add(bd)
+            elif bd.month in alt_quarter_months and 10 <= bd.day <= 22:
+                ex_div_risk_dates.add(bd)
+
+        # Expand risk window ±2 business days
+        expanded_risk = set()
+        for rd in ex_div_risk_dates:
+            expanded_risk.add(rd)
+            d_minus = rd
+            d_plus = rd
+            for _ in range(2):
+                d_minus -= timedelta(days=1)
+                while d_minus.weekday() >= 5:
+                    d_minus -= timedelta(days=1)
+                expanded_risk.add(d_minus)
+                d_plus += timedelta(days=1)
+                while d_plus.weekday() >= 5:
+                    d_plus += timedelta(days=1)
+                expanded_risk.add(d_plus)
+
+        # Build calendar with recommendations
+        calendar = []
+        rebalance_windows = []
+        current_window = None
+
+        for bd in cal_days:
+            is_ex_div_risk = bd in expanded_risk and len(dividend_payers) > 0
+            is_month_end = bd == cal_days[-1] or (
+                len(calendar) < len(cal_days) - 1 and
+                bd.month != (bd + timedelta(days=3)).month
+            )
+            is_quarter_end = is_month_end and bd.month in {3, 6, 9, 12}
+
+            # Scoring: higher = better rebalance day
+            score = 50  # baseline
+            if is_ex_div_risk:
+                score -= 40  # avoid ex-div windows
+            if is_month_end:
+                score += 20  # prefer month-end alignment
+            if is_quarter_end:
+                score += 10  # prefer quarter-end
+            if bd.weekday() in (0, 4):
+                score -= 5  # slight penalty for Mon/Fri (higher vol)
+
+            status = "recommended" if score >= 50 else ("caution" if score >= 30 else "avoid")
+
+            entry = {
+                "date": bd.isoformat(),
+                "weekday": bd.strftime("%A"),
+                "status": status,
+                "score": score,
+                "is_ex_div_risk": is_ex_div_risk,
+                "is_month_end": is_month_end,
+                "is_quarter_end": is_quarter_end,
+            }
+            calendar.append(entry)
+
+            # Track recommended windows
+            if status == "recommended":
+                if current_window is None:
+                    current_window = {"start": bd.isoformat(), "end": bd.isoformat(), "days": 1}
+                else:
+                    current_window["end"] = bd.isoformat()
+                    current_window["days"] += 1
+            else:
+                if current_window and current_window["days"] >= 2:
+                    rebalance_windows.append(current_window)
+                current_window = None
+
+        if current_window and current_window["days"] >= 2:
+            rebalance_windows.append(current_window)
+
+        # Next recommended rebalance date
+        next_recommended = next(
+            (e["date"] for e in calendar if e["status"] == "recommended"), None
+        )
+
+        return {
+            "n_tickers": len(tickers),
+            "dividend_payers": dividend_payers,
+            "n_dividend_payers": len(dividend_payers),
+            "next_recommended_date": next_recommended,
+            "rebalance_windows": rebalance_windows[:8],
+            "calendar": calendar,
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error computing smart rebalance calendar")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
+# Personal Performance Dashboard
+# ---------------------------------------------------------------------------
+
+@router.get("/api/portfolio-performance/{portfolio_id}")
+async def get_portfolio_performance(
+    portfolio_id: int,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Compute actual vs projected performance for a saved portfolio.
+
+    Uses historical prices from creation date to now, comparing actual
+    portfolio value (holding weights × real prices) against projected value
+    (compounding expected return from creation date).
+    """
+    from security import get_user_from_token, resolve_auth_token
+
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    try:
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                "SELECT id, data, created_at FROM saved_portfolios WHERE id = %s AND user_id = %s",
+                (portfolio_id, user["id"]),
+            )
+            portfolio = cur.fetchone()
+            if not portfolio:
+                raise HTTPException(status_code=404, detail="Portfolio not found")
+
+            pdata = portfolio["data"]
+            if isinstance(pdata, str):
+                import json as _json
+                pdata = _json.loads(pdata)
+
+            holdings = pdata.get("holdings", [])
+            if not holdings:
+                raise HTTPException(status_code=400, detail="Portfolio has no holdings")
+
+            investment_amount = float(pdata.get("investment_amount", 0))
+            if investment_amount <= 0:
+                investment_amount = sum(float(h.get("value", 0)) for h in holdings)
+            if investment_amount <= 0:
+                investment_amount = 10000.0
+
+            # Compute weights
+            tickers = [h["ticker"] for h in holdings if h.get("ticker")]
+            weights = {}
+            total_weight = sum(float(h.get("weight", 0)) for h in holdings)
+            for h in holdings:
+                t = h.get("ticker")
+                if t and total_weight > 0:
+                    weights[t] = float(h.get("weight", 0)) / total_weight
+
+            # Expected annual return (weighted average)
+            expected_annual = 0.0
+            for h in holdings:
+                t = h.get("ticker")
+                er = h.get("expected_return")
+                if t and er is not None:
+                    expected_annual += weights.get(t, 0) * float(er) / 100.0
+
+            created_date = portfolio["created_at"]
+            if hasattr(created_date, "date"):
+                created_date = created_date.date()
+
+            # Fetch historical prices from creation date
+            cur.execute(
+                """
+                SELECT date, ticker, close FROM price_history
+                WHERE ticker = ANY(%s) AND date >= %s
+                ORDER BY date ASC
+                """,
+                (tickers, created_date),
+            )
+            rows = cur.fetchall()
+
+        if not rows:
+            return {"error": "No price data available after portfolio creation date", "series": []}
+
+        import pandas as pd
+
+        pdf = pd.DataFrame(rows)
+        pivot = pdf.pivot(index="date", columns="ticker", values="close")
+        pivot = pivot.ffill().bfill()
+
+        # Normalize prices to base-1 on first available date
+        base_prices = pivot.iloc[0]
+        normalized = pivot.div(base_prices)
+
+        # Compute portfolio value series
+        series = []
+        daily_expected = (1 + expected_annual) ** (1 / 252)
+        for i, (date, row) in enumerate(normalized.iterrows()):
+            actual_val = 0.0
+            for t in tickers:
+                if t in row.index and pd.notna(row[t]):
+                    actual_val += weights.get(t, 0) * float(row[t])
+            actual_val *= investment_amount
+
+            projected_val = investment_amount * (daily_expected ** i)
+
+            series.append({
+                "date": date.isoformat() if hasattr(date, "isoformat") else str(date),
+                "actual": round(actual_val, 2),
+                "projected": round(projected_val, 2),
+            })
+
+        # Summary stats
+        if len(series) >= 2:
+            total_return_pct = (series[-1]["actual"] / investment_amount - 1) * 100
+            projected_return_pct = (series[-1]["projected"] / investment_amount - 1) * 100
+            alpha = total_return_pct - projected_return_pct
+        else:
+            total_return_pct = 0
+            projected_return_pct = 0
+            alpha = 0
+
+        return {
+            "portfolio_id": portfolio_id,
+            "portfolio_name": pdata.get("name", f"Portfolio #{portfolio_id}"),
+            "investment_amount": investment_amount,
+            "created_date": str(created_date),
+            "days_tracked": len(series),
+            "current_actual_value": series[-1]["actual"] if series else investment_amount,
+            "current_projected_value": series[-1]["projected"] if series else investment_amount,
+            "total_return_pct": round(total_return_pct, 2),
+            "projected_return_pct": round(projected_return_pct, 2),
+            "alpha_pct": round(alpha, 2),
+            "series": series,
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error computing portfolio performance")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
+# Goals & Targets with Auto-Rebalancing Suggestions
+# ---------------------------------------------------------------------------
+
+@router.get("/api/goals")
+async def get_goals(
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Get all portfolio goals for the current user."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    with get_cursor(dict_cursor=True) as (_, cur):
+        cur.execute(
+            """SELECT g.id, g.name, g.portfolio_id, g.target_allocations,
+                      g.rebalance_threshold, g.created_at, g.updated_at,
+                      sp.name AS portfolio_name
+               FROM portfolio_goals g
+               LEFT JOIN saved_portfolios sp ON sp.id = g.portfolio_id
+               WHERE g.user_id = %s ORDER BY g.created_at DESC""",
+            (user["id"],),
+        )
+        goals = cur.fetchall()
+
+    return {
+        "goals": [
+            {
+                "id": g["id"],
+                "name": g["name"],
+                "portfolio_id": g["portfolio_id"],
+                "portfolio_name": g["portfolio_name"],
+                "target_allocations": g["target_allocations"],
+                "rebalance_threshold": g["rebalance_threshold"],
+                "created_at": g["created_at"].isoformat(),
+                "updated_at": g["updated_at"].isoformat(),
+            }
+            for g in goals
+        ]
+    }
+
+
+@router.post("/api/goals")
+async def create_goal(
+    body: PortfolioGoalRequest,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Create a portfolio goal with target allocations."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    total_weight = sum(body.target_allocations.values())
+    if abs(total_weight - 100.0) > 1.0:
+        raise HTTPException(status_code=400, detail=f"Target allocations must sum to ~100% (got {total_weight:.1f}%)")
+
+    with get_cursor(dict_cursor=True) as (conn, cur):
+        # Limit goals per user
+        cur.execute("SELECT COUNT(*) AS cnt FROM portfolio_goals WHERE user_id = %s", (user["id"],))
+        if cur.fetchone()["cnt"] >= 20:
+            raise HTTPException(status_code=400, detail="Maximum 20 goals allowed")
+
+        if body.portfolio_id:
+            cur.execute(
+                "SELECT id FROM saved_portfolios WHERE id = %s AND user_id = %s",
+                (body.portfolio_id, user["id"]),
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Portfolio not found")
+
+        cur.execute(
+            """INSERT INTO portfolio_goals (user_id, name, portfolio_id, target_allocations, rebalance_threshold)
+               VALUES (%s, %s, %s, %s, %s) RETURNING id, created_at""",
+            (user["id"], body.name, body.portfolio_id, Json(body.target_allocations), body.rebalance_threshold),
+        )
+        row = cur.fetchone()
+        conn.commit()
+
+    return {"id": row["id"], "name": body.name, "created_at": row["created_at"].isoformat()}
+
+
+@router.delete("/api/goals/{goal_id}")
+async def delete_goal(
+    goal_id: int,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Delete a portfolio goal."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    with get_cursor(dict_cursor=True) as (conn, cur):
+        cur.execute(
+            "DELETE FROM portfolio_goals WHERE id = %s AND user_id = %s RETURNING id",
+            (goal_id, user["id"]),
+        )
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Goal not found")
+        conn.commit()
+
+    return {"success": True}
+
+
+@router.get("/api/goals/{goal_id}/rebalance")
+async def get_rebalance_suggestions(
+    goal_id: int,
+    portfolio_value: float = 100000.0,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Compute rebalancing trades to bring portfolio back to target allocations.
+
+    Compares current market-value weights vs target weights and returns
+    suggested buy/sell trades with dollar amounts and share counts.
+    """
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    with get_cursor(dict_cursor=True) as (_, cur):
+        cur.execute(
+            "SELECT target_allocations, rebalance_threshold, portfolio_id FROM portfolio_goals WHERE id = %s AND user_id = %s",
+            (goal_id, user["id"]),
+        )
+        goal = cur.fetchone()
+        if not goal:
+            raise HTTPException(status_code=404, detail="Goal not found")
+
+        targets = goal["target_allocations"]  # {ticker: weight_pct}
+        threshold = goal["rebalance_threshold"]
+        tickers = list(targets.keys())
+
+        # Get current prices
+        cur.execute(
+            """SELECT DISTINCT ON (ticker) ticker, close
+               FROM price_history WHERE ticker = ANY(%s)
+               ORDER BY ticker, date DESC""",
+            (tickers,),
+        )
+        prices = {r["ticker"]: float(r["close"]) for r in cur.fetchall()}
+
+        # If linked to a portfolio, get current holdings
+        current_weights = {}
+        if goal["portfolio_id"]:
+            cur.execute(
+                "SELECT data FROM saved_portfolios WHERE id = %s AND user_id = %s",
+                (goal["portfolio_id"], user["id"]),
+            )
+            prow = cur.fetchone()
+            if prow:
+                pdata = prow["data"]
+                if isinstance(pdata, str):
+                    pdata = json.loads(pdata)
+                holdings = pdata.get("holdings", [])
+                total_w = sum(float(h.get("weight", 0)) for h in holdings)
+                if total_w > 0:
+                    for h in holdings:
+                        t = h.get("ticker")
+                        if t:
+                            current_weights[t] = float(h.get("weight", 0)) / total_w * 100
+
+    # If no current weights from portfolio, assume equal weights at current prices
+    if not current_weights:
+        if prices:
+            equal = 100.0 / len(prices)
+            current_weights = {t: equal for t in prices}
+
+    trades = []
+    needs_rebalance = False
+    max_drift = 0.0
+
+    for ticker in tickers:
+        target_pct = targets.get(ticker, 0)
+        current_pct = current_weights.get(ticker, 0)
+        drift = target_pct - current_pct
+        abs_drift = abs(drift)
+        max_drift = max(max_drift, abs_drift)
+
+        if abs_drift > threshold:
+            needs_rebalance = True
+
+        price = prices.get(ticker, 0)
+        trade_value = portfolio_value * drift / 100.0
+        shares = int(trade_value / price) if price > 0 else 0
+
+        trades.append({
+            "ticker": ticker,
+            "target_pct": round(target_pct, 2),
+            "current_pct": round(current_pct, 2),
+            "drift_pct": round(drift, 2),
+            "action": "buy" if drift > 0 else "sell" if drift < 0 else "hold",
+            "trade_value": round(abs(trade_value), 2),
+            "shares": abs(shares),
+            "price": round(price, 2),
+        })
+
+    trades.sort(key=lambda t: abs(t["drift_pct"]), reverse=True)
+
+    return {
+        "goal_id": goal_id,
+        "portfolio_value": portfolio_value,
+        "needs_rebalance": needs_rebalance,
+        "max_drift_pct": round(max_drift, 2),
+        "threshold_pct": threshold,
+        "trades": trades,
+    }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiTrendingUp, FiBarChart2, FiAlertTriangle, FiTarget, FiRefreshCw, FiShield, FiActivity, FiGrid } from 'react-icons/fi';
+import { FiTrendingUp, FiBarChart2, FiAlertTriangle, FiTarget, FiRefreshCw, FiShield, FiActivity, FiGrid, FiLayers, FiPieChart } from 'react-icons/fi';
 import { Card, CardHeader, CardBody, PerformanceLineChart, EfficientFrontierChart, CorrelationHeatmap, HelpIcon } from '../components';
 import { formatPct, formatNum } from './portfolioBuilderUtils';
 
@@ -11,6 +11,8 @@ const ANALYTICS_TABS = [
   { key: 'stress', label: 'Stress Test', icon: FiAlertTriangle },
   { key: 'riskDecomp', label: 'Risk Decomp', icon: FiTarget },
   { key: 'drift', label: 'Drift', icon: FiRefreshCw },
+  { key: 'styleAnalysis', label: 'Style', icon: FiLayers },
+  { key: 'brinson', label: 'Attribution', icon: FiPieChart },
 ];
 
 const BenchmarkTab = ({ data }) => {
@@ -155,6 +157,108 @@ const DriftTab = ({ data }) => {
   );
 };
 
+const StyleAnalysisTab = ({ data }) => {
+  if (!data) return <p className="pb-analytics-empty">Click "Run" to analyze portfolio style (large/small, value/growth).</p>;
+  const ps = data.portfolio_style || {};
+  return (
+    <div className="pb-analytics-result">
+      <div className="pb-analytics-grid" style={{ marginBottom: 12 }}>
+        <div className="pb-analytics-stat">
+          <span className="pb-stat-label">Portfolio Style <HelpIcon text="Overall style classification based on factor loadings. Size: Small/Mid/Large via SMB beta. Value/Growth via HML beta." /></span>
+          <span className="pb-stat-value">{ps.label || '—'}</span>
+        </div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Size (SMB β)</span><span className="pb-stat-value">{formatNum(ps.beta_smb)}</span></div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Value (HML β)</span><span className="pb-stat-value">{formatNum(ps.beta_hml)}</span></div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Market (Mkt β)</span><span className="pb-stat-value">{formatNum(ps.beta_mkt)}</span></div>
+      </div>
+      {data.style_composition?.length > 0 && (
+        <>
+          <h4 className="pb-sub-title" style={{ margin: '10px 0 6px', fontSize: 13 }}>Style Composition</h4>
+          <table className="pb-analytics-table">
+            <thead><tr><th>Style</th><th>Weight</th></tr></thead>
+            <tbody>
+              {data.style_composition.map((s) => (
+                <tr key={s.style}>
+                  <td>{s.style}</td>
+                  <td>{formatPct(s.weight_pct)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {data.assets?.length > 0 && (
+        <>
+          <h4 className="pb-sub-title" style={{ margin: '10px 0 6px', fontSize: 13 }}>Per-Asset Style</h4>
+          <table className="pb-analytics-table">
+            <thead><tr><th>Ticker</th><th>Weight</th><th>Size</th><th>Value/Growth</th><th>SMB β</th><th>HML β</th></tr></thead>
+            <tbody>
+              {data.assets.slice(0, 20).map((a) => (
+                <tr key={a.ticker}>
+                  <td>{a.ticker}</td>
+                  <td>{(a.weight * 100).toFixed(1)}%</td>
+                  <td>{a.size}</td>
+                  <td>{a.value_growth}</td>
+                  <td>{formatNum(a.beta_smb)}</td>
+                  <td>{formatNum(a.beta_hml)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </div>
+  );
+};
+
+const BrinsonTab = ({ data }) => {
+  if (!data) return <p className="pb-analytics-empty">Click "Run" to decompose performance into allocation vs. selection effects.</p>;
+  return (
+    <div className="pb-analytics-result">
+      <div className="pb-analytics-grid" style={{ marginBottom: 12 }}>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Portfolio Return</span><span className="pb-stat-value">{formatPct(data.portfolio_return_pct)}</span></div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Benchmark Return</span><span className="pb-stat-value">{formatPct(data.benchmark_return_pct)}</span></div>
+        <div className="pb-analytics-stat">
+          <span className="pb-stat-label">Active Return <HelpIcon text="Difference between portfolio and benchmark returns. Positive = outperformance." /></span>
+          <span className={`pb-stat-value ${data.active_return_pct < 0 ? 'pb-negative' : 'pb-positive'}`}>{formatPct(data.active_return_pct)}</span>
+        </div>
+        <div className="pb-analytics-stat">
+          <span className="pb-stat-label">Allocation Effect <HelpIcon text="Return from overweighting/underweighting sectors that outperformed/underperformed the benchmark. Positive means good sector bets." /></span>
+          <span className={`pb-stat-value ${data.total_allocation_pct < 0 ? 'pb-negative' : 'pb-positive'}`}>{formatPct(data.total_allocation_pct)}</span>
+        </div>
+        <div className="pb-analytics-stat">
+          <span className="pb-stat-label">Selection Effect <HelpIcon text="Return from picking better-performing stocks within each sector vs. benchmark. Positive means good stock picks." /></span>
+          <span className={`pb-stat-value ${data.total_selection_pct < 0 ? 'pb-negative' : 'pb-positive'}`}>{formatPct(data.total_selection_pct)}</span>
+        </div>
+        <div className="pb-analytics-stat">
+          <span className="pb-stat-label">Interaction <HelpIcon text="Combined effect of both overweighting sectors and picking good stocks within them. Often small." /></span>
+          <span className={`pb-stat-value ${data.total_interaction_pct < 0 ? 'pb-negative' : 'pb-positive'}`}>{formatPct(data.total_interaction_pct)}</span>
+        </div>
+      </div>
+      {data.sectors?.length > 0 && (
+        <>
+          <h4 className="pb-sub-title" style={{ margin: '10px 0 6px', fontSize: 13 }}>By Sector ({data.period})</h4>
+          <table className="pb-analytics-table">
+            <thead><tr><th>Sector</th><th>Port Wt</th><th>Bench Wt</th><th>Port Ret</th><th>Alloc</th><th>Select</th></tr></thead>
+            <tbody>
+              {data.sectors.map((s) => (
+                <tr key={s.sector}>
+                  <td>{s.sector}</td>
+                  <td>{formatPct(s.port_weight_pct)}</td>
+                  <td>{formatPct(s.bench_weight_pct)}</td>
+                  <td className={s.port_return_pct < 0 ? 'pb-negative' : ''}>{formatPct(s.port_return_pct)}</td>
+                  <td className={s.allocation_pct < 0 ? 'pb-negative' : 'pb-positive'}>{formatPct(s.allocation_pct)}</td>
+                  <td className={s.selection_pct < 0 ? 'pb-negative' : 'pb-positive'}>{formatPct(s.selection_pct)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </div>
+  );
+};
+
 const AnalyticsPanel = ({
   activeTab,
   onTabChange,
@@ -163,6 +267,8 @@ const AnalyticsPanel = ({
   stressData,
   riskDecompData,
   driftData,
+  styleAnalysisData,
+  brinsonData,
   frontierData,
   correlation,
   isBackendFrontierActive,
@@ -253,6 +359,8 @@ const AnalyticsPanel = ({
         {activeTab === 'stress' && <div id="analytics-panel-stress" role="tabpanel" aria-labelledby="analytics-tab-stress"><StressTab data={stressData} /></div>}
         {activeTab === 'riskDecomp' && <div id="analytics-panel-riskDecomp" role="tabpanel" aria-labelledby="analytics-tab-riskDecomp"><RiskDecompTab data={riskDecompData} /></div>}
         {activeTab === 'drift' && <div id="analytics-panel-drift" role="tabpanel" aria-labelledby="analytics-tab-drift"><DriftTab data={driftData} /></div>}
+        {activeTab === 'styleAnalysis' && <div id="analytics-panel-styleAnalysis" role="tabpanel" aria-labelledby="analytics-tab-styleAnalysis"><StyleAnalysisTab data={styleAnalysisData} /></div>}
+        {activeTab === 'brinson' && <div id="analytics-panel-brinson" role="tabpanel" aria-labelledby="analytics-tab-brinson"><BrinsonTab data={brinsonData} /></div>}
       </div>
     </CardBody>
   </Card>

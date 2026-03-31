@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { FiActivity, FiAlertTriangle, FiBarChart2, FiDatabase, FiRefreshCw, FiShield } from 'react-icons/fi';
 import { ConfirmModal } from '../components';
+import ProgressBar from '../components/ProgressBar';
 import './AdminPanel.css';
 
 const AdminPanel = ({ apiBase }) => {
@@ -128,7 +129,12 @@ const AdminPanel = ({ apiBase }) => {
             <FiRefreshCw className={updating ? 'spinning' : ''} />
             {updating ? 'Update In Progress...' : 'Update Stock Data'}
           </button>
-          {updating && <p className="admin-muted">Processing 900+ stocks. You can keep using the platform during update.</p>}
+          {updating && (
+            <div>
+              <ProgressBar active={updating} estimatedMs={900000} label="Updating 900+ stocks from Yahoo Finance..." />
+              <p className="admin-muted">You can keep using the platform during update.</p>
+            </div>
+          )}
         </section>
 
         <section className="admin-glass admin-section">

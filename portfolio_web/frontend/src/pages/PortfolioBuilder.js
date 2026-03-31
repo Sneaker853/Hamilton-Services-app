@@ -17,6 +17,7 @@ import HoldingsTable from './HoldingsTable';
 import ChartsPanel from './ChartsPanel';
 import AnalyticsPanel from './AnalyticsPanel';
 import { HelpIcon } from '../components';
+import ProgressBar from '../components/ProgressBar';
 import { downloadCsv } from '../utils/exportCsv';
 
 const PortfolioSummary = ({ holdingsCount, investmentAmount, totalWeight }) => (
@@ -101,6 +102,8 @@ const PortfolioBuilder = ({ apiBase }) => {
   const [stressData, setStressData] = useState(null);
   const [riskDecompData, setRiskDecompData] = useState(null);
   const [driftData, setDriftData] = useState(null);
+  const [styleAnalysisData, setStyleAnalysisData] = useState(null);
+  const [brinsonData, setBrinsonData] = useState(null);
   const [costBps, setCostBps] = useState(5); // default: 5 bps one-way
 
   const normalizeAssetClass = (value, fallback = 'stock') => {
@@ -1080,6 +1083,18 @@ const PortfolioBuilder = ({ apiBase }) => {
           rebalance_threshold: 5.0,
         });
         setDriftData(res.data);
+      } else if (tab === 'styleAnalysis') {
+        const res = await axios.post(`${apiBase}/portfolio/style-analysis`, {
+          holdings: holdingsPayload,
+        });
+        setStyleAnalysisData(res.data);
+      } else if (tab === 'brinson') {
+        const res = await axios.post(`${apiBase}/portfolio/brinson-attribution`, {
+          holdings: holdingsPayload,
+          benchmark_ticker: 'SPY',
+          period: '1Y',
+        });
+        setBrinsonData(res.data);
       }
     } catch (err) {
       console.error(`Analytics error (${tab}):`, err);
@@ -1185,7 +1200,7 @@ const PortfolioBuilder = ({ apiBase }) => {
 
             {optimizing && (
               <div className="pb-optimizing-banner">
-                Optimizing weights...
+                <ProgressBar active={optimizing} estimatedMs={4000} label="Optimizing weights..." />
               </div>
             )}
 
@@ -1328,6 +1343,8 @@ const PortfolioBuilder = ({ apiBase }) => {
               stressData={stressData}
               riskDecompData={riskDecompData}
               driftData={driftData}
+              styleAnalysisData={styleAnalysisData}
+              brinsonData={brinsonData}
               frontierData={getEfficientFrontierData()}
               correlation={getCorrelationData()}
               isBackendFrontierActive={isBackendFrontierActive}

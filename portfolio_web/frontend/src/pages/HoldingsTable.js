@@ -91,15 +91,17 @@ const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop
           </tr>
         </thead>
         <tbody>
-          {holdings.map((holding, idx) => (
+          {holdings.map((holding, idx) => {
+            const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+            return (
             <tr
               key={idx}
-              draggable
+              draggable={!isTouchDevice}
               aria-label={`Holding row ${holding.ticker}`}
-              onDragStart={() => onDragStart(holding.ticker)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => onDrop(holding.ticker)}
-              onDragEnd={onDragEnd}
+              onDragStart={isTouchDevice ? undefined : () => onDragStart(holding.ticker)}
+              onDragOver={isTouchDevice ? undefined : (event) => event.preventDefault()}
+              onDrop={isTouchDevice ? undefined : () => onDrop(holding.ticker)}
+              onDragEnd={isTouchDevice ? undefined : onDragEnd}
               className="pb-draggable-row"
             >
               <td className="ticker">{holding.ticker}</td>
@@ -150,7 +152,8 @@ const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop
                 </button>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

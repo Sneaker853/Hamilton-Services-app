@@ -979,6 +979,29 @@
     min-width: unset;
   }
 
+  /* Touch-friendly: enlarge reorder & remove buttons for mobile */
+  .portfolio-builder-root .pb-reorder-btn {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 18px;
+    border-radius: 10px;
+  }
+
+  .portfolio-builder-root .pb-remove-btn {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 18px;
+  }
+
+  .portfolio-builder-root .pb-row-reorder-actions {
+    gap: 8px;
+  }
+
+  /* Disable drag cursor on touch — use buttons instead */
+  .portfolio-builder-root .pb-draggable-row {
+    cursor: default;
+  }
+
   .portfolio-builder-root .portfolio-metrics .metrics-grid {
     grid-template-columns: 1fr;
   }

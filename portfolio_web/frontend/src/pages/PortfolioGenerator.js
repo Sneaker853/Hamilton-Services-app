@@ -3,6 +3,7 @@ import axios from 'axios';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { FiTrendingUp, FiDollarSign, FiLayers, FiPieChart, FiBarChart2, FiSettings, FiDownload } from 'react-icons/fi';
 import { Button, Card, CardHeader, CardBody, LoadingSkeleton, CardSkeleton, HelpIcon } from '../components';
+import ProgressBar from '../components/ProgressBar';
 import { downloadCsv } from '../utils/exportCsv';
 import './PortfolioGenerator.css';
 
@@ -461,6 +462,7 @@ const PortfolioGenerator = ({ apiBase }) => {
                 </div>
               </CardHeader>
               <CardBody>
+                <ProgressBar active={loading} estimatedMs={6000} label="Generating portfolio..." />
                 <div className="pg-loading-grid">
                   <CardSkeleton />
                   <LoadingSkeleton height="300px" borderRadius="12px" />

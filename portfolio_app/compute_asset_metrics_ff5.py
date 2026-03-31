@@ -1,6 +1,6 @@
 """
 Compute expected return and volatility for each asset using FF5 factors (monthly)
-and EWMA volatility (daily). Stores results in asset_metrics.
+and GARCH(1,1)/EWMA volatility blend (daily). Stores results in asset_metrics.
 """
 
 import io
@@ -350,6 +350,66 @@ def ewma_volatility(returns: np.ndarray, half_life: int) -> float:
     return float(np.sqrt(var))
 
 
+def garch11_volatility(returns: np.ndarray) -> float:
+    """Estimate conditional volatility via GARCH(1,1) using MLE.
+
+    Model: σ²_t = ω + α·r²_{t-1} + β·σ²_{t-2}
+    Constraints: ω > 0, α ≥ 0, β ≥ 0, α + β < 1 (stationarity).
+    Returns the final conditional daily standard deviation.
+    """
+    from scipy.optimize import minimize
+
+    n = returns.size
+    if n < 60:
+        return float(np.nan)
+
+    r = returns - returns.mean()
+    sample_var = float(np.var(r, ddof=1))
+    if sample_var < 1e-14:
+        return float(np.nan)
+
+    def neg_log_likelihood(params):
+        omega, alpha, beta = params
+        T = r.size
+        sigma2 = np.empty(T)
+        sigma2[0] = sample_var
+        for t in range(1, T):
+            sigma2[t] = omega + alpha * r[t - 1] ** 2 + beta * sigma2[t - 1]
+            if sigma2[t] < 1e-14:
+                sigma2[t] = 1e-14
+        ll = -0.5 * np.sum(np.log(sigma2) + r ** 2 / sigma2)
+        return -ll
+
+    omega0 = sample_var * 0.05
+    alpha0 = 0.08
+    beta0 = 0.88
+    x0 = [omega0, alpha0, beta0]
+
+    bounds = [(1e-10, sample_var * 10), (1e-6, 0.5), (0.5, 0.9999)]
+    constraints = [{"type": "ineq", "fun": lambda p: 0.9999 - p[1] - p[2]}]
+
+    try:
+        res = minimize(
+            neg_log_likelihood,
+            x0,
+            method="SLSQP",
+            bounds=bounds,
+            constraints=constraints,
+            options={"maxiter": 300, "ftol": 1e-10},
+        )
+        if not res.success:
+            return float(np.nan)
+
+        omega, alpha, beta = res.x
+        sigma2 = np.empty(n)
+        sigma2[0] = sample_var
+        for t in range(1, n):
+            sigma2[t] = omega + alpha * r[t - 1] ** 2 + beta * sigma2[t - 1]
+        return float(np.sqrt(sigma2[-1]))
+    except Exception:
+        return float(np.nan)
+
+
 def annualize_return(monthly_return: float) -> float:
     """Annualize a monthly return."""
     return float((1.0 + monthly_return) ** 12 - 1.0)
@@ -551,14 +611,30 @@ def main() -> None:
             trading_days = 252
 
         daily_vol = ewma_volatility(daily_returns, half_life=half_life)
+        garch_vol_daily = garch11_volatility(daily_returns)
         realized_vol = float(np.nanstd(daily_returns, ddof=1) * np.sqrt(trading_days)) if daily_returns.size >= 30 else float("nan")
 
-        if np.isfinite(daily_vol) and np.isfinite(realized_vol):
-            volatility = 0.65 * daily_vol * np.sqrt(trading_days) + 0.35 * realized_vol
-        elif np.isfinite(daily_vol):
-            volatility = float(daily_vol * np.sqrt(trading_days))
-        elif np.isfinite(realized_vol):
-            volatility = realized_vol
+        # Blend: 50% GARCH, 30% EWMA, 20% realized (GARCH preferred)
+        # Fall back gracefully when a model fails to converge
+        garch_ann = float(garch_vol_daily * np.sqrt(trading_days)) if np.isfinite(garch_vol_daily) else float("nan")
+        ewma_ann = float(daily_vol * np.sqrt(trading_days)) if np.isfinite(daily_vol) else float("nan")
+
+        vol_estimates = []
+        vol_weights = []
+        if np.isfinite(garch_ann):
+            vol_estimates.append(garch_ann)
+            vol_weights.append(0.50)
+        if np.isfinite(ewma_ann):
+            vol_estimates.append(ewma_ann)
+            vol_weights.append(0.30)
+        if np.isfinite(realized_vol):
+            vol_estimates.append(realized_vol)
+            vol_weights.append(0.20)
+
+        if vol_estimates:
+            w = np.array(vol_weights)
+            w = w / w.sum()  # re-normalize if some models missing
+            volatility = float(np.dot(w, vol_estimates))
         else:
             volatility = VOL_BOUNDS.get(asset_class, (0.06, 0.70))[0] * 1.5
 

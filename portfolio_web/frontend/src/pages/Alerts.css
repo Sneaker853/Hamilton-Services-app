@@ -1,0 +1,199 @@
+.alerts-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 32px 16px;
+}
+.alerts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.alerts-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.5rem;
+  color: #e0e0e0;
+  margin: 0;
+}
+.alerts-actions {
+  display: flex;
+  gap: 10px;
+}
+.alerts-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.alerts-add-btn {
+  background: #00bcd4;
+  color: #181c24;
+  font-weight: 600;
+}
+.alerts-add-btn:hover { background: #00e5ff; }
+.alerts-check-btn {
+  background: #23293a;
+  color: #b0bec5;
+  border: 1px solid #333;
+}
+.alerts-check-btn:hover { background: #2a3244; }
+.alerts-submit-btn {
+  background: #00bcd4;
+  color: #181c24;
+  font-weight: 600;
+}
+.alerts-submit-btn:hover { background: #00e5ff; }
+.alerts-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.alerts-form {
+  background: #1e2330;
+  border: 1px solid #2a3244;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.alerts-form-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.alerts-form-row:last-child { margin-bottom: 0; }
+.alerts-form input, .alerts-form select {
+  background: #181c24;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #e0e0e0;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  flex: 1;
+  min-width: 100px;
+}
+.alerts-notes-input { flex: 3 !important; }
+
+.alerts-empty {
+  text-align: center;
+  color: #888;
+  padding: 60px 20px;
+}
+.alerts-empty p { margin: 8px 0; }
+.alerts-error {
+  background: #3a1c1c;
+  color: #ff8a80;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.alerts-loading {
+  text-align: center;
+  color: #888;
+  padding: 60px;
+}
+
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.alert-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #1e2330;
+  border: 1px solid #2a3244;
+  border-radius: 10px;
+  padding: 14px 18px;
+  transition: border-color 0.2s;
+}
+.alert-card:hover { border-color: #00bcd4; }
+.alert-card.triggered { border-color: #4caf50; background: #1a2e1a; }
+.alert-card.inactive { opacity: 0.55; }
+.alert-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+.alert-ticker {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #00bcd4;
+  min-width: 55px;
+}
+.alert-condition {
+  color: #b0bec5;
+  font-size: 0.92rem;
+}
+.alert-current {
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.alert-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.alert-badge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.alert-badge.triggered { background: #2e7d32; color: #a5d6a7; }
+.alert-badge.paused { background: #5d4037; color: #bcaaa4; }
+.alert-notes {
+  color: #888;
+  font-size: 0.82rem;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.alert-date {
+  color: #666;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.alert-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.alert-toggle-btn, .alert-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+.alert-toggle-btn { color: #00bcd4; }
+.alert-toggle-btn:hover { background: #23293a; }
+.alert-delete-btn { color: #888; }
+.alert-delete-btn:hover { background: #3a1c1c; color: #ff8a80; }
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 700px) {
+  .alert-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .alert-main { flex-wrap: wrap; }
+  .alert-meta { flex-wrap: wrap; }
+  .alerts-form-row { flex-direction: column; }
+}
