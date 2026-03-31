@@ -14,7 +14,7 @@ export default function PerformanceDashboard({ apiBase }) {
 
   const fetchPortfolios = useCallback(async () => {
     try {
-      const res = await axios.get(`${apiBase}/api/portfolios`);
+      const res = await axios.get(`${apiBase}/portfolios`);
       const list = res.data.portfolios || [];
       setPortfolios(list);
       if (list.length > 0 && !selectedId) setSelectedId(list[0].id);
@@ -34,7 +34,7 @@ export default function PerformanceDashboard({ apiBase }) {
     const fetchPerf = async () => {
       setPerfLoading(true);
       try {
-        const res = await axios.get(`${apiBase}/api/portfolio-performance/${selectedId}`);
+        const res = await axios.get(`${apiBase}/portfolio-performance/${selectedId}`);
         if (!cancelled) setPerfData(res.data);
       } catch {
         if (!cancelled) setPerfData(null);

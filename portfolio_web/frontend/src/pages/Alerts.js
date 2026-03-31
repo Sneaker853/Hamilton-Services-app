@@ -18,7 +18,7 @@ export default function Alerts({ apiBase }) {
   const fetchAlerts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${apiBase}/api/alerts`);
+      const res = await axios.get(`${apiBase}/alerts`);
       setAlerts(res.data.items || []);
       setError('');
     } catch (err) {
@@ -39,7 +39,7 @@ export default function Alerts({ apiBase }) {
     if (!formTicker.trim() || !formThreshold) return;
     try {
       setCreating(true);
-      await axios.post(`${apiBase}/api/alerts`, {
+      await axios.post(`${apiBase}/alerts`, {
         ticker: formTicker.trim().toUpperCase(),
         condition: formCondition,
         threshold: parseFloat(formThreshold),
@@ -59,7 +59,7 @@ export default function Alerts({ apiBase }) {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${apiBase}/api/alerts/${id}`);
+      await axios.delete(`${apiBase}/alerts/${id}`);
       setAlerts(prev => prev.filter(a => a.id !== id));
     } catch {
       setError('Failed to delete alert.');
@@ -68,7 +68,7 @@ export default function Alerts({ apiBase }) {
 
   const handleToggle = async (id) => {
     try {
-      const res = await axios.patch(`${apiBase}/api/alerts/${id}/toggle`);
+      const res = await axios.patch(`${apiBase}/alerts/${id}/toggle`);
       setAlerts(prev => prev.map(a => a.id === id ? { ...a, is_active: res.data.is_active } : a));
     } catch {
       setError('Failed to toggle alert.');
@@ -78,7 +78,7 @@ export default function Alerts({ apiBase }) {
   const handleCheck = async () => {
     try {
       setChecking(true);
-      const res = await axios.post(`${apiBase}/api/alerts/check`);
+      const res = await axios.post(`${apiBase}/alerts/check`);
       if (res.data.triggered.length > 0) {
         fetchAlerts();
       }

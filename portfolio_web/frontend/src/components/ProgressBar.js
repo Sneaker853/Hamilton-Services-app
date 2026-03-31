@@ -54,7 +54,8 @@ const ProgressBar = ({ active, estimatedMs = 5000, label = 'Processing...', onCo
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [active, estimatedMs, onComplete, progress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, estimatedMs]);
 
   if (!active && progress === 0) return null;
 

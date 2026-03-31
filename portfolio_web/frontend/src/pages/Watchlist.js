@@ -39,7 +39,7 @@ const Watchlist = ({ apiBase }) => {
     try {
       const res = await axios.get(`${apiBase}/stocks/search`, { params: { q, limit: 8 } });
       const existing = new Set(items.map(i => i.ticker));
-      setSearchResults((res.data || []).filter(s => !existing.has(s.ticker)));
+      setSearchResults((res.data.results || []).filter(s => !existing.has(s.ticker)));
     } catch { setSearchResults([]); }
     finally { setSearching(false); }
   }, [apiBase, items]);

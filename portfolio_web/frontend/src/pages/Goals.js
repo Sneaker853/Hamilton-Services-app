@@ -19,8 +19,8 @@ export default function Goals({ apiBase }) {
   const fetchGoals = useCallback(async () => {
     try {
       const [goalsRes, portRes] = await Promise.all([
-        axios.get(`${apiBase}/api/goals`),
-        axios.get(`${apiBase}/api/portfolios`).catch(() => ({ data: { portfolios: [] } })),
+        axios.get(`${apiBase}/goals`),
+        axios.get(`${apiBase}/portfolios`).catch(() => ({ data: { portfolios: [] } })),
       ]);
       setGoals(goalsRes.data.goals || []);
       setPortfolios(portRes.data.portfolios || []);
@@ -55,7 +55,7 @@ export default function Goals({ apiBase }) {
     if (Object.keys(allocations).length < 1) return;
     try {
       setCreating(true);
-      await axios.post(`${apiBase}/api/goals`, {
+      await axios.post(`${apiBase}/goals`, {
         name: formName,
         portfolio_id: formPortfolioId ? parseInt(formPortfolioId) : null,
         target_allocations: allocations,
@@ -75,7 +75,7 @@ export default function Goals({ apiBase }) {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${apiBase}/api/goals/${id}`);
+      await axios.delete(`${apiBase}/goals/${id}`);
       setGoals(prev => prev.filter(g => g.id !== id));
     } catch {
       setError('Failed to delete goal.');
@@ -84,7 +84,7 @@ export default function Goals({ apiBase }) {
 
   const fetchRebalance = async (goalId) => {
     try {
-      const res = await axios.get(`${apiBase}/api/goals/${goalId}/rebalance`);
+      const res = await axios.get(`${apiBase}/goals/${goalId}/rebalance`);
       setRebalanceData(prev => ({ ...prev, [goalId]: res.data }));
     } catch {
       setError('Failed to compute rebalance suggestions.');
