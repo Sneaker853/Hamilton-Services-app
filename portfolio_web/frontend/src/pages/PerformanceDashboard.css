@@ -74,6 +74,21 @@
 .perf-stat-card.positive .perf-stat-value { color: #66bb6a; }
 .perf-stat-card.negative .perf-stat-value { color: #ef5350; }
 
+.perf-stat-delta {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.perf-stat-delta.up { color: #66bb6a; }
+.perf-stat-delta.down { color: #ef5350; }
+
+.perf-stat-note {
+  font-size: 0.68rem;
+  color: #666;
+  margin-top: 3px;
+  font-style: italic;
+}
+
 .perf-chart-card {
   background: #1e2330;
   border: 1px solid #2a3244;
@@ -88,7 +103,16 @@
 .perf-chart-sub {
   color: #888;
   font-size: 0.82rem;
+  margin: 0 0 6px 0;
+}
+.perf-chart-note {
+  color: #666;
+  font-size: 0.75rem;
   margin: 0 0 16px 0;
+  line-height: 1.5;
+  font-style: italic;
+  border-left: 3px solid rgba(255, 152, 0, 0.4);
+  padding-left: 10px;
 }
 
 .perf-empty {

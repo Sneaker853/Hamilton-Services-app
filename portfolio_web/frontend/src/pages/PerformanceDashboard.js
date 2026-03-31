@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { FiTrendingUp, FiChevronDown } from 'react-icons/fi';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceLine, CartesianGrid } from 'recharts';
 import './PerformanceDashboard.css';
 
 export default function PerformanceDashboard({ apiBase }) {
@@ -46,6 +46,39 @@ export default function PerformanceDashboard({ apiBase }) {
     return () => { cancelled = true; };
   }, [apiBase, selectedId]);
 
+  const fmt = (v) => `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  // Compute Y-axis domain that zooms into the actual data range
+  const yDomain = useMemo(() => {
+    if (!perfData?.series?.length) return [0, 100];
+    let min = Infinity, max = -Infinity;
+    for (const pt of perfData.series) {
+      const a = pt.actual ?? Infinity;
+      const p = pt.projected ?? Infinity;
+      if (a < min) min = a;
+      if (p < min) min = p;
+      if (a > max) max = a;
+      if (p > max) max = p;
+    }
+    // Also include the investment amount in the range
+    const inv = perfData.investment_amount || 0;
+    if (inv < min) min = inv;
+    if (inv > max) max = inv;
+    const padding = Math.max((max - min) * 0.15, max * 0.01);
+    return [Math.floor(min - padding), Math.ceil(max + padding)];
+  }, [perfData]);
+
+  // Smart Y-axis tick formatter based on range
+  const formatYAxis = useCallback((v) => {
+    const range = yDomain[1] - yDomain[0];
+    if (range < 2000) return `$${Number(v).toLocaleString()}`;
+    if (range < 20000) return `$${(v / 1000).toFixed(1)}k`;
+    return `$${(v / 1000).toFixed(0)}k`;
+  }, [yDomain]);
+
+  // Gain/loss since inception
+  const gainLoss = perfData ? perfData.current_actual_value - perfData.investment_amount : 0;
+
   if (loading) return <div className="perf-page"><div className="perf-loading">Loading portfolios...</div></div>;
   if (error) return <div className="perf-page"><div className="perf-error">{error}</div></div>;
   if (portfolios.length === 0) return (
@@ -57,8 +90,6 @@ export default function PerformanceDashboard({ apiBase }) {
       </div>
     </div>
   );
-
-  const fmt = (v) => `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   return (
     <div className="perf-page">
@@ -83,17 +114,21 @@ export default function PerformanceDashboard({ apiBase }) {
               <div className="perf-stat-label">Invested</div>
               <div className="perf-stat-value">{fmt(perfData.investment_amount)}</div>
             </div>
-            <div className="perf-stat-card">
+            <div className={`perf-stat-card ${perfData.total_return_pct >= 0 ? 'positive' : 'negative'}`}>
               <div className="perf-stat-label">Current Value</div>
               <div className="perf-stat-value">{fmt(perfData.current_actual_value)}</div>
+              <div className={`perf-stat-delta ${gainLoss >= 0 ? 'up' : 'down'}`}>
+                {gainLoss >= 0 ? '+' : ''}{fmt(gainLoss)}
+              </div>
             </div>
             <div className={`perf-stat-card ${perfData.total_return_pct >= 0 ? 'positive' : 'negative'}`}>
               <div className="perf-stat-label">Actual Return</div>
               <div className="perf-stat-value">{perfData.total_return_pct >= 0 ? '+' : ''}{perfData.total_return_pct.toFixed(2)}%</div>
             </div>
             <div className="perf-stat-card">
-              <div className="perf-stat-label">Projected Return</div>
+              <div className="perf-stat-label">Model Estimate</div>
               <div className="perf-stat-value">{perfData.projected_return_pct >= 0 ? '+' : ''}{perfData.projected_return_pct.toFixed(2)}%</div>
+              <div className="perf-stat-note">FF5 projection</div>
             </div>
             <div className={`perf-stat-card ${perfData.alpha_pct >= 0 ? 'positive' : 'negative'}`}>
               <div className="perf-stat-label">Alpha</div>
@@ -102,31 +137,37 @@ export default function PerformanceDashboard({ apiBase }) {
           </div>
 
           <div className="perf-chart-card">
-            <h3>Actual vs Projected Value</h3>
+            <h3>Actual vs Model Projection</h3>
             <p className="perf-chart-sub">{perfData.days_tracked} days tracked since {perfData.created_date}</p>
-            <ResponsiveContainer width="100%" height={350}>
-              <AreaChart data={perfData.series} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00bcd4" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#00bcd4" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradProjected" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ff9800" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#ff9800" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+            <p className="perf-chart-note">
+              The dashed line shows the theoretical growth path based on expected returns from the factor model, not a guarantee.
+              The solid line shows your portfolio's real market performance.
+            </p>
+            <ResponsiveContainer width="100%" height={380}>
+              <LineChart data={perfData.series} margin={{ top: 10, right: 20, left: 15, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.15)" />
                 <XAxis dataKey="date" tick={{ fill: '#888', fontSize: 11 }} tickFormatter={d => d.slice(5)} />
-                <YAxis tick={{ fill: '#888', fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                <YAxis
+                  domain={yDomain}
+                  tick={{ fill: '#888', fontSize: 11 }}
+                  tickFormatter={formatYAxis}
+                  width={70}
+                />
+                <ReferenceLine
+                  y={perfData.investment_amount}
+                  stroke="rgba(148,163,184,0.5)"
+                  strokeDasharray="4 4"
+                  label={{ value: 'Invested', fill: '#64748b', fontSize: 10, position: 'insideTopRight' }}
+                />
                 <Tooltip
                   contentStyle={{ background: '#1e2330', border: '1px solid #333', borderRadius: 8 }}
                   labelStyle={{ color: '#b0bec5' }}
-                  formatter={v => fmt(v)}
+                  formatter={(v, name) => [fmt(v), name]}
                 />
                 <Legend />
-                <Area type="monotone" dataKey="actual" name="Actual" stroke="#00bcd4" fill="url(#gradActual)" strokeWidth={2} />
-                <Area type="monotone" dataKey="projected" name="Projected" stroke="#ff9800" fill="url(#gradProjected)" strokeWidth={2} strokeDasharray="5 3" />
-              </AreaChart>
+                <Line type="monotone" dataKey="actual" name="Actual" stroke="#00bcd4" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="projected" name="Model Estimate" stroke="#ff9800" strokeWidth={1.5} strokeDasharray="6 3" dot={false} opacity={0.7} />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </>
