@@ -4,11 +4,11 @@ import sys
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Cookie
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Cookie, Request
 
 from config import PROJECT_ROOT
 from db import get_cursor
-from security import require_admin_user, resolve_auth_token
+from security import require_admin_user, resolve_auth_token, write_audit_log
 from config import SESSION_COOKIE_NAME
 
 logger = logging.getLogger(__name__)
@@ -35,11 +35,14 @@ def _run_fundamentals_ingestion() -> None:
 @router.post("/update-fundamentals")
 async def update_fundamentals(
     background_tasks: BackgroundTasks,
+    req: Request = None,
     x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
     session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
 ):
-    require_admin_user(resolve_auth_token(x_auth_token, session_cookie))
+    user = require_admin_user(resolve_auth_token(x_auth_token, session_cookie))
     background_tasks.add_task(_run_fundamentals_ingestion)
+    client_ip = req.client.host if req and req.client else None
+    write_audit_log("admin_update_fundamentals", user_id=user["id"], ip_address=client_ip)
     return {
         "status": "started",
         "message": "Stock fundamentals update initiated. This will take ~15-20 minutes.",

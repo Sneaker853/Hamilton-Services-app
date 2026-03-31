@@ -46,6 +46,8 @@ class OptimizeWeightsRequest(BaseModel):
     objective: str = Field("max_sharpe", description="Objective: max_sharpe, min_vol, target_return, risk_parity")
     target_return: Optional[float] = Field(None, description="Target annual return (decimal) for target_return objective")
     cost_bps: float = Field(0.0, ge=0, le=200, description="Trading cost in basis points per unit turnover")
+    max_volume_pct: Optional[float] = Field(None, gt=0, le=100, description="Max position as % of 20-day avg volume (liquidity constraint)")
+    portfolio_value: Optional[float] = Field(None, gt=0, description="Total portfolio value in USD (needed for liquidity constraint)")
 
 
 class CovarianceMetricHolding(BaseModel):

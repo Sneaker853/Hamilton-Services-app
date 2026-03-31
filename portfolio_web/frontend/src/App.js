@@ -7,7 +7,9 @@ import {
   FiActivity,
   FiBarChart2,
   FiBriefcase,
+  FiColumns,
   FiGrid,
+  FiHelpCircle,
   FiInfo,
   FiLock,
   FiLogIn,
@@ -18,6 +20,7 @@ import {
   FiShield,
   FiX,
 } from 'react-icons/fi';
+import { RiScales3Line } from 'react-icons/ri';
 
 // Theme
 import { useThemeStore, applyTheme } from './components/ThemeContext';
@@ -32,6 +35,13 @@ import Login from './pages/Login';
 import Mission from './pages/Mission';
 import Contact from './pages/Contact';
 import ChangePassword from './pages/ChangePassword';
+import PortfolioComparison from './pages/PortfolioComparison';
+import StockComparison from './pages/StockComparison';
+import HelpDocs from './pages/HelpDocs';
+import SharedPortfolio from './pages/SharedPortfolio';
+import Landing from './pages/Landing';
+import KeyboardShortcuts from './components/KeyboardShortcuts';
+import OnboardingWizard from './components/OnboardingWizard';
 
 // API base URL strategy:
 // - Production: explicit REACT_APP_API_URL (or same-origin /api reverse proxy)
@@ -108,6 +118,7 @@ function AppContent() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [authUser, setAuthUser] = useState(null);
   const [guestMode, setGuestMode] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const location = useLocation();
   const theme = useThemeStore(state => state.theme);
 
@@ -198,6 +209,9 @@ function AppContent() {
     { path: '/portfolio', label: 'Optimizer', icon: FiActivity },
     { path: '/portfolio-builder', label: 'Builder', icon: FiBriefcase },
     { path: '/market-data', label: 'Market Data', icon: FiBarChart2 },
+    { path: '/compare', label: 'Compare', icon: FiColumns },
+    { path: '/compare-stocks', label: 'Stocks', icon: RiScales3Line },
+    { path: '/help', label: 'Help', icon: FiHelpCircle },
     { path: '/mission', label: 'Mission', icon: FiInfo },
     { path: '/contact', label: 'Contact', icon: FiMail },
     { path: '/change-password', label: 'Password', icon: FiLock, requiresAuth: true },
@@ -210,9 +224,21 @@ function AppContent() {
   }, [authUser]);
 
   if (!authUser && !guestMode) {
-    // Auto-enable guest mode so the dashboard is the landing page
-    localStorage.setItem('guestMode', 'true');
-    setGuestMode(true);
+    // Show landing page instead of auto-enabling guest mode
+    return (
+      <Landing
+        onContinueAsGuest={() => {
+          localStorage.setItem('guestMode', 'true');
+          setGuestMode(true);
+          if (!localStorage.getItem('onboardingComplete')) {
+            setShowOnboarding(true);
+          }
+        }}
+        onLogin={() => {
+          window.location.href = '/login';
+        }}
+      />
+    );
   }
 
   const canAccessAdmin = String(authUser?.email || '').trim().toLowerCase() === ADMIN_ALLOWED_EMAIL;
@@ -243,6 +269,8 @@ function AppContent() {
   return (
     <div className="shell-app">
       <a href="#main-content" className="skip-to-main">Skip to main content</a>
+      <KeyboardShortcuts />
+      {showOnboarding && <OnboardingWizard onClose={() => setShowOnboarding(false)} />}
       <button
         className="shell-mobile-toggle"
         onClick={() => setMobileNavOpen(true)}
@@ -355,6 +383,10 @@ function AppContent() {
           <Route path="/portfolio" element={<PortfolioGenerator apiBase={API_BASE} />} />
           <Route path="/portfolio-builder" element={<PortfolioBuilder apiBase={API_BASE} />} />
           <Route path="/market-data" element={<MarketData apiBase={API_BASE} />} />
+          <Route path="/compare" element={<PortfolioComparison apiBase={API_BASE} />} />
+          <Route path="/compare-stocks" element={<StockComparison apiBase={API_BASE} />} />
+          <Route path="/help" element={<HelpDocs />} />
+          <Route path="/shared/:shareToken" element={<SharedPortfolio apiBase={API_BASE} />} />
           <Route path="/mission" element={<Mission />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/change-password" element={authUser ? <ChangePassword apiBase={API_BASE} /> : <Navigate to="/login" replace />} />

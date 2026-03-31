@@ -1,0 +1,131 @@
+.kb-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: kbFadeIn 0.15s ease;
+}
+
+@keyframes kbFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.kb-panel {
+  background: var(--bg-secondary, #1a1f2e);
+  border: 1px solid var(--border-color, rgba(100, 116, 139, 0.2));
+  border-radius: 14px;
+  padding: 28px 32px 20px;
+  min-width: 360px;
+  max-width: 460px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.kb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.kb-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary, #e2e8f0);
+}
+
+.kb-close {
+  background: none;
+  border: none;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+}
+
+.kb-close:hover {
+  color: var(--text-primary, #e2e8f0);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.kb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+}
+
+.kb-keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.kb-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-teal, #22d3ee);
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+}
+
+.kb-then {
+  font-size: 10px;
+  color: var(--text-muted, #64748b);
+  margin: 0 2px;
+}
+
+.kb-desc {
+  font-size: 13px;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.kb-hint {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, rgba(100, 116, 139, 0.15));
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  text-align: center;
+}
+
+.kb-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary-teal, #22d3ee);
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  margin: 0 2px;
+}

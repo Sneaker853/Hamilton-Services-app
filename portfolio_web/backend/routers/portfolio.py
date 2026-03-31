@@ -4,15 +4,17 @@ import logging
 import math
 import json
 import os
+import secrets
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from sklearn.covariance import LedoitWolf, OAS
-from fastapi import APIRouter, HTTPException, Header, Cookie
+from fastapi import APIRouter, HTTPException, Header, Cookie, Request
 from psycopg2.extras import Json
 
 from db import get_cursor
+from cache_store import TTLCache
 from schemas import (
     SavePortfolioRequest,
     SavedPortfolioResponse,
@@ -30,7 +32,7 @@ from schemas import (
     DriftMonitorRequest,
     AnalyzePortfolioRequest,
 )
-from security import get_user_from_token, resolve_auth_token
+from security import get_user_from_token, resolve_auth_token, write_audit_log
 from services import get_config_manager, get_portfolio_builder
 from config import SESSION_COOKIE_NAME, PORTFOLIO_RISK_FREE_RATE
 from portfolio_helpers import (
@@ -44,6 +46,7 @@ from portfolio_helpers import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["portfolio"])
+_persona_cache = TTLCache(ttl_seconds=300)
 
 # Helper functions (_load_mean_returns_and_covariance, _get_covariance_method,
 # _normalize_weight_map, _apply_min_active_weight, _fetch_price_matrix,
@@ -53,6 +56,7 @@ router = APIRouter(tags=["portfolio"])
 @router.post("/api/portfolios/save", response_model=SavedPortfolioResponse)
 async def save_portfolio(
     request: SavePortfolioRequest,
+    req: Request = None,
     x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
     session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
 ):
@@ -74,6 +78,9 @@ async def save_portfolio(
         )
         saved = cur.fetchone()
         conn.commit()
+
+    client_ip = req.client.host if req and req.client else None
+    write_audit_log("portfolio_save", user_id=user["id"], detail=f"name={request.name.strip()}", ip_address=client_ip)
 
     return dict(saved)
 
@@ -100,12 +107,116 @@ async def list_saved_portfolios(
     return {"portfolios": rows}
 
 
+@router.post("/api/portfolios/{portfolio_id}/share")
+async def share_portfolio(
+    portfolio_id: int,
+    req: Request = None,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Generate a share token for a saved portfolio (read-only link)."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+
+    with get_cursor(dict_cursor=True) as (conn, cur):
+        cur.execute(
+            "SELECT id, share_token FROM saved_portfolios WHERE id = %s AND user_id = %s",
+            (portfolio_id, user["id"]),
+        )
+        row = cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    # Return existing token if already shared
+    if row.get("share_token"):
+        return {"share_token": row["share_token"], "portfolio_id": portfolio_id}
+
+    share_token = secrets.token_urlsafe(24)
+
+    with get_cursor() as (conn, cur):
+        cur.execute(
+            "UPDATE saved_portfolios SET share_token = %s, is_public = TRUE WHERE id = %s AND user_id = %s",
+            (share_token, portfolio_id, user["id"]),
+        )
+        conn.commit()
+
+    client_ip = req.client.host if req and req.client else None
+    write_audit_log("portfolio_share", user_id=user["id"], detail=f"portfolio_id={portfolio_id}", ip_address=client_ip)
+
+    return {"share_token": share_token, "portfolio_id": portfolio_id}
+
+
+@router.delete("/api/portfolios/{portfolio_id}/share")
+async def unshare_portfolio(
+    portfolio_id: int,
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Revoke the share link for a portfolio."""
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+
+    with get_cursor() as (conn, cur):
+        cur.execute(
+            "UPDATE saved_portfolios SET share_token = NULL, is_public = FALSE WHERE id = %s AND user_id = %s",
+            (portfolio_id, user["id"]),
+        )
+        updated = cur.rowcount
+        conn.commit()
+
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    return {"success": True, "message": "Share link revoked"}
+
+
+@router.get("/api/shared/{share_token}")
+async def get_shared_portfolio(share_token: str):
+    """Public endpoint — fetch a shared portfolio by its token (read-only)."""
+    if not share_token or len(share_token) > 64:
+        raise HTTPException(status_code=400, detail="Invalid share token")
+
+    with get_cursor(dict_cursor=True) as (_, cur):
+        cur.execute(
+            """
+            SELECT sp.id, sp.name, sp.source, sp.created_at, sp.data,
+                   au.email AS owner_email
+            FROM saved_portfolios sp
+            JOIN app_users au ON au.id = sp.user_id
+            WHERE sp.share_token = %s AND sp.is_public = TRUE
+            """,
+            (share_token,),
+        )
+        row = cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Shared portfolio not found")
+
+    # Redact owner email to first char + domain
+    owner = row.get("owner_email", "")
+    if "@" in owner:
+        local, domain = owner.split("@", 1)
+        owner = f"{local[0]}***@{domain}"
+
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "source": row["source"],
+        "created_at": row["created_at"],
+        "data": row["data"],
+        "shared_by": owner,
+    }
+
+
 @router.get("/api/personas", response_model=List[PersonaInfo])
 async def get_personas():
+    cached = _persona_cache.get("personas")
+    if cached is not None:
+        return cached
+
     try:
         config_manager = get_config_manager()
         personas = config_manager.get_personas()
-        return [
+        result = [
             PersonaInfo(
                 name=name,
                 display_name=config.get("display_name", name),
@@ -115,6 +226,8 @@ async def get_personas():
             )
             for name, config in personas.items()
         ]
+        _persona_cache.set("personas", result)
+        return result
     except Exception:
         logger.exception("Error fetching personas")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -480,6 +593,40 @@ async def optimize_weights(request: OptimizeWeightsRequest):
 
         bounds = tuple((0.0, 1.0) for _ in range(len(aligned_tickers)))
 
+        # ---- Liquidity constraint: max % of 20-day average volume ----
+        if request.max_volume_pct is not None and request.portfolio_value and request.portfolio_value > 0:
+            with get_cursor(dict_cursor=True) as (_, cur):
+                cur.execute(
+                    """
+                    SELECT ticker, AVG(volume) AS avg_volume, AVG(close) AS avg_price
+                    FROM (
+                        SELECT ticker, volume, close,
+                               ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
+                        FROM price_history
+                        WHERE ticker = ANY(%s) AND volume IS NOT NULL AND volume > 0
+                    ) sub
+                    WHERE rn <= 20
+                    GROUP BY ticker
+                    """,
+                    (aligned_tickers,),
+                )
+                vol_rows = cur.fetchall()
+
+            vol_map = {r["ticker"]: r for r in vol_rows}
+            max_pct = request.max_volume_pct / 100.0
+
+            # Convert bounds to list so we can tighten per-asset upper bounds
+            bounds_list = list(bounds)
+            for i, t in enumerate(aligned_tickers):
+                v = vol_map.get(t)
+                if v and v["avg_volume"] and v["avg_price"] and v["avg_price"] > 0:
+                    # Max dollar value = max_pct * avg_volume * avg_price
+                    max_dollar = float(v["avg_volume"]) * float(v["avg_price"]) * max_pct
+                    max_weight = min(1.0, max_dollar / request.portfolio_value)
+                    lo, hi = bounds_list[i]
+                    bounds_list[i] = (lo, min(hi, max_weight))
+            bounds = tuple(bounds_list)
+
         # Warm-start: use previous weights if available, else equal-weight
         initial_weights = np.array([1.0 / len(aligned_tickers)] * len(aligned_tickers))
         if prev_total > 0:
@@ -584,6 +731,7 @@ async def optimize_weights(request: OptimizeWeightsRequest):
                 else None,
                 "hhi_penalty_lambda": hhi_lambda,
                 "cost_bps": cost_bps,
+                "max_volume_pct": float(request.max_volume_pct) if request.max_volume_pct is not None else None,
             },
         }
     except HTTPException:
@@ -1238,17 +1386,35 @@ async def portfolio_backtest(req: BacktestRequest):
 # ---------------------------------------------------------------------------
 
 _DEFAULT_SCENARIOS = {
+    # --- Historically calibrated scenarios ---
+    "gfc_2008": {
+        "label": "2008 Global Financial Crisis (Oct 07–Mar 09)",
+        "shocks": {"equity_factor": -0.55, "bond_factor": 0.12, "vol_multiplier": 3.5},
+    },
+    "covid_crash_2020": {
+        "label": "COVID-19 Crash (Feb–Mar 2020)",
+        "shocks": {"equity_factor": -0.34, "bond_factor": 0.05, "vol_multiplier": 4.0},
+    },
+    "taper_tantrum_2013": {
+        "label": "2013 Taper Tantrum (May–Sep 2013)",
+        "shocks": {"equity_factor": -0.06, "bond_factor": -0.05, "vol_multiplier": 1.4},
+    },
+    "rate_hike_2022": {
+        "label": "2022 Rate Hike Cycle (Jan–Oct 2022)",
+        "shocks": {"equity_factor": -0.25, "bond_factor": -0.17, "vol_multiplier": 1.5},
+    },
+    "dot_com_bust_2000": {
+        "label": "Dot-Com Bust (Mar 2000–Oct 2002)",
+        "shocks": {"equity_factor": -0.49, "bond_factor": 0.15, "vol_multiplier": 2.0},
+    },
+    "euro_debt_crisis_2011": {
+        "label": "European Debt Crisis (Jul–Oct 2011)",
+        "shocks": {"equity_factor": -0.19, "bond_factor": 0.06, "vol_multiplier": 2.2},
+    },
+    # --- Generic factor-based scenarios ---
     "rate_shock_up_200bps": {
         "label": "Interest rate shock +200 bps",
         "shocks": {"bond_factor": -0.08, "equity_factor": -0.05},
-    },
-    "equity_drawdown_20pct": {
-        "label": "Equity drawdown −20%",
-        "shocks": {"equity_factor": -0.20},
-    },
-    "volatility_spike_2x": {
-        "label": "Volatility spike (2× recent vol)",
-        "shocks": {"vol_multiplier": 2.0},
     },
     "stagflation": {
         "label": "Stagflation (rates up, equities down, vol up)",
@@ -1518,6 +1684,58 @@ async def drift_monitor(req: DriftMonitorRequest):
                 "breaches_threshold": breaches,
             })
 
+        # ----- Predictive drift forecast (30-day) -----
+        forecast = None
+        try:
+            prices_90, _ = _fetch_price_matrix(tickers, 90)
+            if not prices_90.empty and prices_90.shape[0] >= 20:
+                present_90 = [t for t in tickers if t in prices_90.columns]
+                # Compute annualized daily return trend & volatility
+                daily_returns = prices_90[present_90].pct_change().dropna()
+                if len(daily_returns) >= 10:
+                    mean_daily = daily_returns.mean()
+                    std_daily = daily_returns.std()
+
+                    # Project 30 trading days forward using drift = mean * 30
+                    projected_change = np.array(
+                        [float(1.0 + mean_daily.get(t, 0.0) * 30) if t in present_90 else 1.0
+                         for t in tickers],
+                        dtype=float,
+                    )
+                    projected_drifted = target_weights * projected_change
+                    proj_sum = projected_drifted.sum()
+                    projected_weights = projected_drifted / proj_sum if proj_sum > 0 else target_weights.copy()
+
+                    proj_drift_abs = projected_weights - target_weights
+                    forecast_drift_score = float(math.sqrt(np.sum(proj_drift_abs ** 2))) * 100
+
+                    # Rebalance urgency: low / medium / high
+                    if forecast_drift_score >= threshold * 2:
+                        urgency = "high"
+                    elif forecast_drift_score >= threshold:
+                        urgency = "medium"
+                    else:
+                        urgency = "low"
+
+                    forecast_assets = []
+                    for i, t in enumerate(tickers):
+                        vol_30d = float(std_daily.get(t, 0.0) * math.sqrt(30) * 100) if t in present_90 else 0.0
+                        forecast_assets.append({
+                            "ticker": t,
+                            "projected_weight_pct": round(float(projected_weights[i]) * 100, 4),
+                            "projected_drift_pct": round(float(proj_drift_abs[i]) * 100, 4),
+                            "volatility_30d_pct": round(vol_30d, 4),
+                        })
+
+                    forecast = {
+                        "horizon_days": 30,
+                        "forecast_drift_score": round(forecast_drift_score, 4),
+                        "rebalance_urgency": urgency,
+                        "assets": forecast_assets,
+                    }
+        except Exception:
+            logger.debug("Predictive drift forecast unavailable", exc_info=True)
+
         return {
             "drift_score": round(drift_score, 4),
             "rebalance_threshold_pct": threshold,
@@ -1525,6 +1743,7 @@ async def drift_monitor(req: DriftMonitorRequest):
             "n_assets": len(tickers),
             "assets": assets,
             "recommendations": recommendations,
+            "forecast": forecast,
         }
     except HTTPException:
         raise

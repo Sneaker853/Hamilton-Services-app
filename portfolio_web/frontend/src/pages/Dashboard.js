@@ -16,6 +16,7 @@ import {
   FiBarChart2,
   FiBriefcase,
   FiDollarSign,
+  FiShare2,
   FiTrendingDown,
   FiTrendingUp,
 } from 'react-icons/fi';
@@ -236,6 +237,27 @@ const Dashboard = ({ apiBase }) => {
     window.location.href = '/portfolio-builder';
   };
 
+  const sharePortfolio = async (e, portfolioId) => {
+    e.stopPropagation();
+    try {
+      const csrfToken = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1];
+      const response = await axios.post(
+        `${apiBase}/portfolios/${portfolioId}/share`,
+        {},
+        { withCredentials: true, headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {} }
+      );
+      const token = response.data?.share_token;
+      if (token) {
+        const shareUrl = `${window.location.origin}/shared/${token}`;
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Share link copied to clipboard!');
+      }
+    } catch (err) {
+      console.error('Error sharing portfolio:', err);
+      alert('Could not create share link. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="dashboard-root">
@@ -448,7 +470,19 @@ const Dashboard = ({ apiBase }) => {
             >
               <header>
                 <strong>{item.name}</strong>
-                <span>{item.source || 'manual'}</span>
+                <span className="dashboard-card-header-actions">
+                  <span>{item.source || 'manual'}</span>
+                  {localStorage.getItem('authUser') && (
+                    <button
+                      type="button"
+                      className="dashboard-share-btn"
+                      title="Share portfolio"
+                      onClick={(e) => sharePortfolio(e, item.id)}
+                    >
+                      <FiShare2 size={14} />
+                    </button>
+                  )}
+                </span>
               </header>
               <div>
                 <p>Holdings</p>

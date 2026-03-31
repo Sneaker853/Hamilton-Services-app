@@ -9,6 +9,22 @@ const REQUEST_TIMEOUT = IS_PRODUCTION ? 45000 : 10000;
 const normalizeApiBase = (value) => String(value || '').trim().replace(/\/+$/, '');
 const isLocalApiBase = (value) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(String(value || '').trim());
 
+const getPasswordStrength = (pw) => {
+  if (!pw) return { score: 0, label: '', color: '' };
+  let score = 0;
+  if (pw.length >= 10) score++;
+  if (pw.length >= 14) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[a-z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+  if (score <= 2) return { score, label: 'Weak', color: '#ef4444' };
+  if (score <= 4) return { score, label: 'Fair', color: '#f59e0b' };
+  if (score === 5) return { score, label: 'Good', color: '#22d3ee' };
+  return { score, label: 'Strong', color: '#10b981' };
+};
+
 const resolveApiBase = (apiBase) => {
   const normalizedPropBase = normalizeApiBase(apiBase);
   if (normalizedPropBase) {
@@ -241,6 +257,23 @@ const Login = ({ apiBase, fullScreen = false }) => {
                   aria-invalid={!!error}
                   aria-describedby={error ? 'login-error' : undefined}
                 />
+                {(mode === 'signup' || mode === 'reset') && password && (() => {
+                  const strength = getPasswordStrength(password);
+                  return (
+                    <div style={{ marginTop: '6px' }}>
+                      <div style={{ display: 'flex', gap: '3px', marginBottom: '4px' }}>
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                          <div key={i} style={{
+                            flex: 1, height: '4px', borderRadius: '2px',
+                            background: i <= strength.score ? strength.color : 'rgba(100, 116, 139, 0.3)',
+                            transition: 'background 0.2s',
+                          }} />
+                        ))}
+                      </div>
+                      <span style={{ fontSize: '12px', color: strength.color }}>{strength.label}</span>
+                    </div>
+                  );
+                })()}
                 {mode === 'login' && (
                   <div style={{ marginTop: '8px', textAlign: 'right' }}>
                     <button

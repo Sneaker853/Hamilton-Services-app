@@ -421,11 +421,97 @@
   }
 
   .portfolio-generator-root .holdings-table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: visible;
   }
 
-  .portfolio-generator-root .holdings-table-wrapper table {
-    min-width: 540px;
+  /* Convert generator holdings table to stacked card layout on mobile */
+  .portfolio-generator-root .holdings-table table thead {
+    display: none;
   }
+
+  .portfolio-generator-root .holdings-table table,
+  .portfolio-generator-root .holdings-table table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .portfolio-generator-root .holdings-table table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    padding: 12px;
+    margin-bottom: 8px;
+    background: var(--bg-tertiary, rgba(19, 26, 46, 0.5));
+    border: 1px solid var(--border-color, rgba(100, 116, 139, 0.15));
+    border-radius: 10px;
+  }
+
+  .portfolio-generator-root .holdings-table table td {
+    padding: 2px 0;
+    border: none;
+    font-size: 13px;
+  }
+
+  .portfolio-generator-root .holdings-table table td::before {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted, #64748b);
+    margin-bottom: 2px;
+  }
+
+  .portfolio-generator-root .holdings-table table td:nth-child(1)::before { content: 'Ticker'; }
+  .portfolio-generator-root .holdings-table table td:nth-child(2)::before { content: 'Market'; }
+  .portfolio-generator-root .holdings-table table td:nth-child(3)::before { content: 'Shares'; }
+  .portfolio-generator-root .holdings-table table td:nth-child(4)::before { content: 'Value'; }
+  .portfolio-generator-root .holdings-table table td:nth-child(5)::before { content: 'Weight'; }
+  .portfolio-generator-root .holdings-table table td:nth-child(6)::before { content: 'Sector'; }
+
+  .portfolio-generator-root .holdings-table table {
+    min-width: unset;
+  }
+
+  /* Dashboard tables on mobile */
+  .dashboard-table thead {
+    display: none;
+  }
+
+  .dashboard-table,
+  .dashboard-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .dashboard-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    padding: 10px;
+    margin-bottom: 6px;
+    background: var(--bg-tertiary, rgba(19, 26, 46, 0.5));
+    border-radius: 8px;
+  }
+
+  .dashboard-table td {
+    padding: 2px 0;
+    border: none;
+    font-size: 13px;
+  }
+
+  .dashboard-table td::before {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted, #64748b);
+    margin-bottom: 2px;
+  }
+
+  .dashboard-table td:nth-child(1)::before { content: 'Asset'; }
+  .dashboard-table td:nth-child(2)::before { content: 'Allocation'; }
+  .dashboard-table td:nth-child(3)::before { content: 'Value'; }
+  .dashboard-table td:nth-child(4)::before { content: 'Exp. Return'; }
 }

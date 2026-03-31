@@ -49,6 +49,7 @@ _total_latency_ms = 0.0
 _auth_limiter = SlidingWindowRateLimiter(limit=AUTH_RATE_LIMIT, window_seconds=RATE_LIMIT_WINDOW_SECONDS)
 _login_limiter = SlidingWindowRateLimiter(limit=5, window_seconds=300)
 _password_reset_limiter = SlidingWindowRateLimiter(limit=3, window_seconds=600)
+_password_reset_confirm_limiter = SlidingWindowRateLimiter(limit=5, window_seconds=900)
 _register_limiter = SlidingWindowRateLimiter(limit=10, window_seconds=600)
 _admin_limiter = SlidingWindowRateLimiter(limit=ADMIN_RATE_LIMIT, window_seconds=RATE_LIMIT_WINDOW_SECONDS)
 _contact_limiter = SlidingWindowRateLimiter(limit=3, window_seconds=600)
@@ -174,6 +175,8 @@ async def request_context_middleware(request: Request, call_next):
             result = _register_limiter.check(client_id)
         elif auth_path == "/api/auth/password-reset/request":
             result = _password_reset_limiter.check(client_id)
+        elif auth_path == "/api/auth/password-reset/confirm":
+            result = _password_reset_confirm_limiter.check(client_id)
         else:
             result = _auth_limiter.check(client_id)
         if not result.allowed:

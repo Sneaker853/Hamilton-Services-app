@@ -3,7 +3,9 @@ import logging
 import math
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header, Cookie
+import re
+
+from fastapi import APIRouter, HTTPException, Header, Cookie, Query
 
 from db import get_cursor
 from cache_store import TTLCache
@@ -91,6 +93,41 @@ def _metric_select_expr(asset_metrics_exists: bool, asset_metric_columns: set[st
     return "NULL"
 
 
+@router.get("/api/stocks/search")
+async def search_stocks(q: str = Query(..., min_length=1, max_length=50), limit: int = Query(10, ge=1, le=50)):
+    sanitized = re.sub(r'[^a-zA-Z0-9 .\-]', '', q).strip()
+    if not sanitized:
+        return {"results": []}
+
+    try:
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                """
+                SELECT ticker, name, exchange, sector
+                FROM stocks
+                WHERE ticker ILIKE %s OR name ILIKE %s
+                ORDER BY
+                    CASE WHEN ticker ILIKE %s THEN 0 ELSE 1 END,
+                    ticker
+                LIMIT %s
+                """,
+                (f"{sanitized}%", f"%{sanitized}%", f"{sanitized}%", limit),
+            )
+            results = cur.fetchall()
+
+        suggestions = []
+        for row in results:
+            r = dict(row)
+            if r.get("exchange"):
+                r["exchange"] = EXCHANGE_MAP.get(r["exchange"], r["exchange"])
+            suggestions.append(r)
+
+        return {"results": suggestions}
+    except Exception:
+        logger.exception("Error in stock search")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @router.get("/api/stocks/summary")
 async def get_stocks_summary():
     try:
@@ -131,15 +168,21 @@ async def get_stocks_summary():
 
 
 @router.get("/api/stocks/all")
-async def get_all_stocks():
-    cached = market_data_cache.get("stocks_all")
-    if cached is not None:
-        return cached
+async def get_all_stocks(page: Optional[int] = None, page_size: int = 100):
+    # When no page is specified, return all stocks (backward-compatible)
+    if page is None:
+        cached = market_data_cache.get("stocks_all")
+        if cached is not None:
+            return cached
+
+    if page is not None and page < 1:
+        raise HTTPException(status_code=400, detail="page must be >= 1")
+    if page_size < 1 or page_size > 500:
+        raise HTTPException(status_code=400, detail="page_size must be between 1 and 500")
 
     try:
         with get_cursor(dict_cursor=True) as (_, cur):
-            cur.execute(
-                """
+            base_query = """
                 SELECT
                     s.ticker,
                     s.name,
@@ -163,9 +206,18 @@ async def get_all_stocks():
                     ORDER BY date DESC LIMIT 1
                 ) ph ON true
                 ORDER BY s.ticker
-                """
-            )
+            """
+
+            if page is not None:
+                offset = (page - 1) * page_size
+                cur.execute(base_query + " LIMIT %s OFFSET %s", (page_size, offset))
+            else:
+                cur.execute(base_query)
+
             stocks = cur.fetchall()
+
+            cur.execute("SELECT COUNT(*) AS total FROM stocks")
+            total_count = cur.fetchone()["total"]
 
             cur.execute(
                 """
@@ -202,13 +254,22 @@ async def get_all_stocks():
 
         result = {
             "stocks": stocks_list,
-            "total": len(stocks_list),
+            "total": total_count,
             "latest_price_date": freshness["latest_price_date"].isoformat() if freshness and freshness.get("latest_price_date") else None,
             "latest_price_ticker_count": int(freshness["latest_price_ticker_count"]) if freshness and freshness.get("latest_price_ticker_count") is not None else 0,
             "tickers_with_price": int(freshness["tickers_with_price"]) if freshness and freshness.get("tickers_with_price") is not None else 0,
         }
-        market_data_cache.set("stocks_all", result)
+
+        if page is not None:
+            result["page"] = page
+            result["page_size"] = page_size
+            result["total_pages"] = math.ceil(total_count / page_size)
+        else:
+            market_data_cache.set("stocks_all", result)
+
         return result
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Error fetching securities")
         raise HTTPException(status_code=500, detail="Internal server error")

@@ -871,6 +871,14 @@ body {
   letter-spacing: -0.5px;
 }
 
+.metric-source-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  opacity: 0.7;
+  font-style: italic;
+}
+
 .error-message {
   background: rgba(255, 71, 87, 0.1);
   color: var(--danger-color);

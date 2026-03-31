@@ -914,12 +914,69 @@
   }
 
   .portfolio-builder-root .holdings-table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: visible;
+  }
+
+  /* Convert holdings table to stacked card layout on mobile */
+  .portfolio-builder-root .holdings-table table thead {
+    display: none;
+  }
+
+  .portfolio-builder-root .holdings-table table,
+  .portfolio-builder-root .holdings-table table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .portfolio-builder-root .holdings-table table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+    padding: 14px;
+    margin-bottom: 8px;
+    background: var(--bg-tertiary, rgba(19, 26, 46, 0.5));
+    border: 1px solid var(--border-color, rgba(100, 116, 139, 0.15));
+    border-radius: 10px;
+  }
+
+  .portfolio-builder-root .holdings-table table td {
+    padding: 2px 0;
+    border: none;
+    font-size: 13px;
+  }
+
+  .portfolio-builder-root .holdings-table table td::before {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted, #64748b);
+    margin-bottom: 2px;
+  }
+
+  .portfolio-builder-root .holdings-table table td:nth-child(1)::before { content: 'Ticker'; }
+  .portfolio-builder-root .holdings-table table td:nth-child(2)::before { content: 'Sector'; }
+  .portfolio-builder-root .holdings-table table td:nth-child(3)::before { content: 'Weight'; }
+  .portfolio-builder-root .holdings-table table td:nth-child(4)::before { content: 'Confidence'; }
+  .portfolio-builder-root .holdings-table table td:nth-child(5)::before { content: 'Value'; }
+  .portfolio-builder-root .holdings-table table td:nth-child(6)::before { content: 'Shares'; }
+
+  .portfolio-builder-root .holdings-table table td:nth-child(7),
+  .portfolio-builder-root .holdings-table table td:nth-child(8) {
+    grid-column: span 1;
+  }
+
+  .portfolio-builder-root .holdings-table table td:nth-child(7)::before { content: 'Reorder'; }
+  .portfolio-builder-root .holdings-table table td:nth-child(8)::before { content: ''; }
+
+  .portfolio-builder-root .pb-weight-input {
+    width: 100%;
+    max-width: 80px;
   }
 
   .portfolio-builder-root .holdings-table table {
-    min-width: 540px;
+    min-width: unset;
   }
 
   .portfolio-builder-root .portfolio-metrics .metrics-grid {
@@ -928,6 +985,7 @@
 
   .portfolio-builder-root .pb-analytics-tabs {
     gap: 6px;
+    flex-wrap: wrap;
   }
 
   .portfolio-builder-root .pb-analytics-actions {

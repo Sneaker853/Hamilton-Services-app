@@ -22,6 +22,9 @@ const MarketData = ({ apiBase }) => {
   const [latestPriceDate, setLatestPriceDate] = useState(null);
   const [latestPriceTickerCount, setLatestPriceTickerCount] = useState(0);
   const [tickersWithPrice, setTickersWithPrice] = useState(0);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchRef = React.useRef(null);
 
   const fetchAllStocks = useCallback(async () => {
     try {
@@ -77,6 +80,32 @@ const MarketData = ({ apiBase }) => {
     fetchAllStocks();
     fetchFilterOptions();
   }, [fetchAllStocks, fetchFilterOptions]);
+
+  useEffect(() => {
+    if (!searchTerm || searchTerm.length < 1) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const response = await axios.get(`${apiBase}/stocks/search`, { params: { q: searchTerm, limit: 8 } });
+        setSuggestions(response.data.results || []);
+        setShowSuggestions(true);
+      } catch { /* ignore */ }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [searchTerm, apiBase]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!selectedStock) return;
@@ -191,13 +220,44 @@ const MarketData = ({ apiBase }) => {
 
       <div className="market-layout">
         <section className="market-left-panel market-glass">
-          <div className="market-search-wrap">
+          <div className="market-search-wrap" ref={searchRef} style={{ position: 'relative' }}>
             <FiSearch />
             <input
               type="text"
               placeholder="Search ticker or name..."
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
+              onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+                background: 'rgba(13, 19, 33, 0.97)', border: '1px solid rgba(100, 116, 139, 0.28)',
+                borderRadius: '0 0 8px 8px', maxHeight: '280px', overflowY: 'auto',
+              }}>
+                {suggestions.map((s) => (
+                  <button
+                    key={s.ticker}
+                    type="button"
+                    onClick={() => {
+                      setSelectedStock(s.ticker);
+                      setSearchTerm(s.ticker);
+                      setShowSuggestions(false);
+                    }}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      width: '100%', padding: '8px 12px', border: 'none', background: 'transparent',
+                      color: '#e2e8f0', cursor: 'pointer', fontSize: '13px', textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(34, 211, 238, 0.08)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <span><strong>{s.ticker}</strong> — {s.name}</span>
+                    <em style={{ fontSize: '11px', color: '#64748b' }}>{s.exchange}</em>
+                  </button>
+                ))}
+              </div>
+            )}
             />
           </div>
 

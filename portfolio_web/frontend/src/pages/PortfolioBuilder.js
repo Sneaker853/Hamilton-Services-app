@@ -16,6 +16,8 @@ import AssetSearchSection from './AssetSearchSection';
 import HoldingsTable from './HoldingsTable';
 import ChartsPanel from './ChartsPanel';
 import AnalyticsPanel from './AnalyticsPanel';
+import { HelpIcon } from '../components';
+import { downloadCsv } from '../utils/exportCsv';
 
 const PortfolioSummary = ({ holdingsCount, investmentAmount, totalWeight }) => (
   <div className="portfolio-summary pb-summary-wrap">
@@ -41,20 +43,21 @@ const PortfolioSummary = ({ holdingsCount, investmentAmount, totalWeight }) => (
   </div>
 );
 
-const MetricsPanel = ({ metrics }) => (
+const MetricsPanel = ({ metrics, isBackend }) => (
   <div className="portfolio-metrics pb-metrics-wrap">
     <h3 className="pb-sub-title">Portfolio Metrics</h3>
     <div className="metrics-grid">
       <div className="metric-item">
-        <span className="metric-label">Expected Return</span>
+        <span className="metric-label">Expected Return <HelpIcon text="Annualized return estimate based on a Fama-French 5-factor model with cross-validated ridge regression. Reflects forward-looking factor exposures, not past performance." /></span>
         <span className="metric-value">{metrics.expected_return.toFixed(2)}%</span>
+        <span className="metric-source-label">{isBackend ? 'FF5 factor model' : 'Estimated (local)'}</span>
       </div>
       <div className="metric-item">
-        <span className="metric-label">Volatility</span>
+        <span className="metric-label">Volatility <HelpIcon text="Annualized standard deviation of portfolio returns, estimated from a 600+ day covariance matrix with Ledoit-Wolf shrinkage. Higher values indicate greater price fluctuation risk." /></span>
         <span className="metric-value">{metrics.volatility.toFixed(2)}%</span>
       </div>
       <div className="metric-item">
-        <span className="metric-label">Sharpe Ratio</span>
+        <span className="metric-label">Sharpe Ratio <HelpIcon text="Risk-adjusted return: (Expected Return − Risk-Free Rate) ÷ Volatility. Values above 1.0 are generally considered good; above 2.0 is excellent. Uses 2% as the risk-free rate." /></span>
         <span className="metric-value">{metrics.sharpe_ratio.toFixed(2)}</span>
       </div>
     </div>
@@ -1022,6 +1025,19 @@ const PortfolioBuilder = ({ apiBase }) => {
     }
   };
 
+  const handleExportCsv = () => {
+    if (holdings.length === 0) return;
+    const headers = ['Ticker', 'Sector', 'Asset Class', 'Weight (%)', 'Value ($)', 'Shares', 'Expected Return', 'Volatility'];
+    const rows = holdings.map((h) => [
+      h.ticker, h.sector || '', h.asset_class || 'stock',
+      h.weight?.toFixed(2) || '', h.value?.toFixed(2) || '', h.shares?.toFixed(2) || '',
+      typeof h.expected_return === 'number' ? h.expected_return.toFixed(2) : '',
+      typeof h.volatility === 'number' ? h.volatility.toFixed(2) : ''
+    ]);
+    const name = saveName.trim() || 'builder_portfolio';
+    downloadCsv(`${name}_holdings`, headers, rows);
+  };
+
   // Phase 3 — Analytics run handler
   const runAnalytics = async (tab) => {
     if (holdings.length === 0) return;
@@ -1115,7 +1131,8 @@ const PortfolioBuilder = ({ apiBase }) => {
                   onChange={(e) => setAutoOptimize(e.target.checked)}
                   className="pb-check-input"
                 />
-                <span className="pb-check-title">Auto-Optimize Weights</span>
+                                <span className="pb-check-title">Auto-Optimize Weights</span>
+                <HelpIcon text="When enabled, portfolio weights are automatically optimized for the best Sharpe ratio (return per unit of risk) whenever you add or remove holdings." />
               </label>
             </div>
 
@@ -1123,7 +1140,7 @@ const PortfolioBuilder = ({ apiBase }) => {
               <div className="pb-constraints-panel">
                 <div className="pb-constraints-row">
                   <div className="pb-constraint-field">
-                    <label className="pb-constraint-label">Min Position (%)</label>
+                    <label className="pb-constraint-label">Min Position (%) <HelpIcon text="Positions with weight below this threshold are automatically zeroed out during optimization, preventing negligible allocations that add complexity without meaningful impact." /></label>
                     <input
                       type="number"
                       value={minActiveWeight}
@@ -1245,6 +1262,13 @@ const PortfolioBuilder = ({ apiBase }) => {
                   >
                     {optimizing ? 'Optimizing...' : 'Re-Optimize'}
                   </button>
+                  <button
+                    onClick={handleExportCsv}
+                    className="pb-action-btn secondary"
+                    title="Download holdings as CSV"
+                  >
+                    Export CSV
+                  </button>
                 </div>
               </div>
               {saveMessage && (
@@ -1258,7 +1282,7 @@ const PortfolioBuilder = ({ apiBase }) => {
                 totalWeight={totalWeight}
               />
 
-              <MetricsPanel metrics={metrics} />
+              <MetricsPanel metrics={metrics} isBackend={backendMetrics && backendMetrics.signature === activeHoldingsSignature} />
 
               <ChartsPanel
                 sectorData={getSectorDistribution()}

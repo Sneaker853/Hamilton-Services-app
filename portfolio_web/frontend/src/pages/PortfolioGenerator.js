@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { FiTrendingUp, FiDollarSign, FiLayers, FiPieChart, FiBarChart2, FiSettings } from 'react-icons/fi';
+import { FiTrendingUp, FiDollarSign, FiLayers, FiPieChart, FiBarChart2, FiSettings, FiDownload } from 'react-icons/fi';
 import { Button, Card, CardHeader, CardBody, LoadingSkeleton, CardSkeleton, HelpIcon } from '../components';
+import { downloadCsv } from '../utils/exportCsv';
 import './PortfolioGenerator.css';
 
 const PERSONA_DESCRIPTIONS = {
@@ -97,10 +98,10 @@ const PortfolioGenerator = ({ apiBase }) => {
     const herfindahl = toFiniteNumber(metrics.herfindahl_index);
 
     return [
-      { label: 'Expected Return', value: formatPercent(expectedReturn) },
-      { label: 'Volatility', value: formatPercent(volatility) },
-      { label: 'Sharpe Ratio', value: sharpeRatio !== null ? sharpeRatio.toFixed(2) : 'N/A' },
-      { label: 'Concentration (HHI)', value: herfindahl !== null ? herfindahl.toFixed(4) : 'N/A' }
+      { label: 'Expected Return', value: formatPercent(expectedReturn), help: 'Annualized return estimate from a Fama-French 5-factor model. Reflects forward-looking factor exposures, not past performance.', source: 'FF5 factor model' },
+      { label: 'Volatility', value: formatPercent(volatility), help: 'Annualized standard deviation of returns. Higher volatility means larger price swings and greater uncertainty.' },
+      { label: 'Sharpe Ratio', value: sharpeRatio !== null ? sharpeRatio.toFixed(2) : 'N/A', help: 'Risk-adjusted return: (Expected Return − Risk-Free Rate) ÷ Volatility. Values above 1.0 are good; above 2.0 is excellent.' },
+      { label: 'Concentration (HHI)', value: herfindahl !== null ? herfindahl.toFixed(4) : 'N/A', help: 'Herfindahl-Hirschman Index: sum of squared portfolio weights. Ranges from 1/N (fully diversified) to 1.0 (single holding). Lower is more diversified.' }
     ];
   };
 
@@ -271,6 +272,17 @@ const PortfolioGenerator = ({ apiBase }) => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleExportCsv = () => {
+    if (!portfolio?.holdings?.length) return;
+    const headers = ['Ticker', 'Name', 'Type', 'Market', 'Sector', 'Shares', 'Value', 'Weight (%)'];
+    const rows = portfolio.holdings.map((h) => [
+      h.ticker, h.name || '', h.type || 'stock', h.exchange || '', h.sector || '',
+      h.shares?.toFixed(2) || '', h.value?.toFixed(2) || '', h.weight?.toFixed(2) || ''
+    ]);
+    const name = saveName.trim() || portfolio.persona || 'portfolio';
+    downloadCsv(`${name}_holdings`, headers, rows);
   };
 
   const displayMetrics = buildDisplayMetrics();
@@ -472,6 +484,14 @@ const PortfolioGenerator = ({ apiBase }) => {
                   <Button
                     variant="secondary"
                     size="small"
+                    onClick={handleExportCsv}
+                    icon={<FiDownload />}
+                  >
+                    Export CSV
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="small"
                     onClick={() => {
                       if (!portfolio) return;
                       const draftName = saveName.trim() || `${portfolio.persona || 'Optimized'} Portfolio`;
@@ -615,8 +635,9 @@ const PortfolioGenerator = ({ apiBase }) => {
                   <div className="metrics-grid">
                     {displayMetrics.map((metric) => (
                         <div key={metric.label} className="metric-item">
-                          <span className="metric-label">{metric.label}</span>
+                          <span className="metric-label">{metric.label} {metric.help && <HelpIcon text={metric.help} />}</span>
                           <span className="metric-value">{metric.value}</span>
+                          {metric.source && <span className="metric-source-label">{metric.source}</span>}
                         </div>
                       ))}
                   </div>

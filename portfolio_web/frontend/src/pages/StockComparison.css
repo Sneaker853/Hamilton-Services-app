@@ -1,0 +1,156 @@
+.stock-comparison-root {
+  max-width: 1200px;
+}
+
+/* Search */
+.stock-comparison-search {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.stock-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.stock-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-secondary, #888);
+  pointer-events: none;
+}
+
+.stock-search-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem 0.65rem 2.4rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: var(--bg-secondary, #fff);
+  color: var(--text-primary, #1a1a2e);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.stock-search-input:focus {
+  border-color: var(--accent-color, #6366f1);
+}
+
+.stock-search-spinner {
+  position: absolute;
+  right: 12px;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-color, #d1d5db);
+  border-top-color: var(--accent-color, #6366f1);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Suggestions dropdown */
+.stock-search-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary, #fff);
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  margin-top: 4px;
+  list-style: none;
+  padding: 0;
+  z-index: 20;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.stock-search-suggestions li button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary, #1a1a2e);
+  text-align: left;
+}
+
+.stock-search-suggestions li button:hover {
+  background: var(--bg-hover, #f1f5f9);
+}
+
+.stock-search-suggestions li button strong {
+  min-width: 60px;
+  color: var(--accent-color, #6366f1);
+}
+
+.stock-search-suggestions li button small {
+  margin-left: auto;
+  color: var(--text-secondary, #888);
+  font-size: 0.8rem;
+}
+
+/* Chips */
+.stock-comparison-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.stock-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  background: var(--accent-color, #6366f1);
+  color: #fff;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.stock-chip button {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.8;
+}
+
+.stock-chip button:hover {
+  opacity: 1;
+}
+
+/* Trend indicators */
+.trend-up {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--danger-color, #ef4444);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.trend-down {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--success-color, #22c55e);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+/* Re-use comparison-table styles from PortfolioComparison */

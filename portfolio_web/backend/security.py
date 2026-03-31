@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import secrets
 from datetime import datetime, timedelta
@@ -8,6 +9,8 @@ from fastapi import HTTPException
 
 from config import SESSION_TTL_HOURS, ADMIN_ALLOWED_EMAIL
 from db import get_cursor
+
+logger = logging.getLogger(__name__)
 
 
 def hash_password(password: str, salt_hex: Optional[str] = None) -> Dict[str, str]:
@@ -156,6 +159,9 @@ def get_user_from_token(token: Optional[str]) -> Dict:
         user = cur.fetchone()
 
     if not user:
+        # Constant-time comparison against a dummy to prevent timing attacks
+        # that could reveal whether a token format is valid
+        secrets.compare_digest(token, "0" * len(token))
         raise HTTPException(status_code=401, detail="Invalid auth token")
 
     return dict(user)
@@ -172,3 +178,15 @@ def require_admin_user(token: Optional[str]) -> Dict:
     if str(user.get("email", "")).strip().lower() != ADMIN_ALLOWED_EMAIL:
         raise HTTPException(status_code=403, detail="Admin access restricted")
     return user
+
+
+def write_audit_log(action: str, user_id: Optional[int] = None, detail: Optional[str] = None, ip_address: Optional[str] = None) -> None:
+    try:
+        with get_cursor() as (conn, cur):
+            cur.execute(
+                "INSERT INTO audit_log (user_id, action, detail, ip_address) VALUES (%s, %s, %s, %s)",
+                (user_id, action, detail, ip_address),
+            )
+            conn.commit()
+    except Exception:
+        logger.warning("Failed to write audit log: action=%s user_id=%s", action, user_id, exc_info=True)

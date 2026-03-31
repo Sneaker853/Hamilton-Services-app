@@ -5,7 +5,7 @@ import secrets
 import re
 from datetime import datetime, timedelta, UTC
 
-from fastapi import APIRouter, HTTPException, Header, Response, Cookie
+from fastapi import APIRouter, HTTPException, Header, Request, Response, Cookie
 
 from db import get_cursor
 from schemas import (
@@ -27,6 +27,7 @@ from security import (
     revoke_session,
     revoke_user_sessions,
     resolve_auth_token,
+    write_audit_log,
 )
 from config import (
     SESSION_COOKIE_NAME,
@@ -159,7 +160,7 @@ def _send_password_reset_email(email: str, token: str) -> None:
 
 
 @router.post("/register", response_model=AuthResponse)
-async def register_user(request: AuthRegisterRequest, response: Response):
+async def register_user(request: AuthRegisterRequest, response: Response, req: Request = None):
     email = request.email.strip().lower()
     is_owner_email = bool(ADMIN_ALLOWED_EMAIL) and email == ADMIN_ALLOWED_EMAIL
     if "@" not in email:
@@ -196,11 +197,14 @@ async def register_user(request: AuthRegisterRequest, response: Response):
     if csrf_token:
         _set_csrf_cookie(response, csrf_token)
 
+    client_ip = req.client.host if req and req.client else None
+    write_audit_log("register", user_id=user["id"], detail=f"email={email}", ip_address=client_ip)
+
     return {"token": token, "user": dict(user)}
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login_user(request: AuthLoginRequest, response: Response):
+async def login_user(request: AuthLoginRequest, response: Response, req: Request = None):
     email = request.email.strip().lower()
 
     with get_cursor(dict_cursor=True) as (_, cur):
@@ -214,10 +218,14 @@ async def login_user(request: AuthLoginRequest, response: Response):
         )
         user = cur.fetchone()
 
+    client_ip = req.client.host if req and req.client else None
+
     if not user:
+        write_audit_log("login_failed", detail=f"email={email} (no account)", ip_address=client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not verify_password(request.password, user["password_hash"], user["password_salt"]):
+        write_audit_log("login_failed", user_id=user["id"], detail=f"email={email} (wrong password)", ip_address=client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if ADMIN_ALLOWED_EMAIL and email == ADMIN_ALLOWED_EMAIL and not bool(user.get("is_admin", False)):
@@ -248,6 +256,8 @@ async def login_user(request: AuthLoginRequest, response: Response):
     csrf_token = get_session_csrf_token(token)
     if csrf_token:
         _set_csrf_cookie(response, csrf_token)
+    write_audit_log("login", user_id=user["id"], detail=f"email={email}", ip_address=client_ip)
+
     return {
         "token": token,
         "user": {
@@ -329,7 +339,7 @@ async def request_password_reset(request: PasswordResetRequest):
 
 
 @router.post("/password-reset/confirm", response_model=MessageResponse)
-async def confirm_password_reset(request: PasswordResetConfirmRequest):
+async def confirm_password_reset(request: PasswordResetConfirmRequest, req: Request = None):
     _validate_password_strength(request.new_password)
 
     user_id = _consume_action_token(request.token, "password_reset")
@@ -351,12 +361,16 @@ async def confirm_password_reset(request: PasswordResetConfirmRequest):
 
     revoke_user_sessions(user_id)
 
+    client_ip = req.client.host if req and req.client else None
+    write_audit_log("password_reset", user_id=user_id, ip_address=client_ip)
+
     return {"success": True, "message": "Password reset successfully."}
 
 
 @router.post("/change-password", response_model=MessageResponse)
 async def change_password(
     request: ChangePasswordRequest,
+    req: Request = None,
     x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
     session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
 ):
@@ -387,6 +401,9 @@ async def change_password(
             (password_data["hash"], password_data["salt"], user["id"]),
         )
         conn.commit()
+
+    client_ip = req.client.host if req and req.client else None
+    write_audit_log("password_change", user_id=user["id"], ip_address=client_ip)
 
     return {"success": True, "message": "Password changed successfully."}
 

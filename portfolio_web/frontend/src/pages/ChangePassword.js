@@ -3,6 +3,22 @@ import axios from 'axios';
 import { FiLock } from 'react-icons/fi';
 import './ChangePassword.css';
 
+const getPasswordStrength = (pw) => {
+  if (!pw) return { score: 0, label: '', color: '' };
+  let score = 0;
+  if (pw.length >= 10) score++;
+  if (pw.length >= 14) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[a-z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+  if (score <= 2) return { score, label: 'Weak', color: '#ef4444' };
+  if (score <= 4) return { score, label: 'Fair', color: '#f59e0b' };
+  if (score === 5) return { score, label: 'Good', color: '#22d3ee' };
+  return { score, label: 'Strong', color: '#10b981' };
+};
+
 const ChangePassword = ({ apiBase }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -86,6 +102,23 @@ const ChangePassword = ({ apiBase }) => {
             <span className="change-pw-hint">
               Min 10 characters, include uppercase, lowercase, number, and symbol.
             </span>
+            {newPassword && (() => {
+              const strength = getPasswordStrength(newPassword);
+              return (
+                <div style={{ marginTop: '6px' }}>
+                  <div style={{ display: 'flex', gap: '3px', marginBottom: '4px' }}>
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} style={{
+                        flex: 1, height: '4px', borderRadius: '2px',
+                        background: i <= strength.score ? strength.color : 'rgba(100, 116, 139, 0.3)',
+                        transition: 'background 0.2s',
+                      }} />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: '12px', color: strength.color }}>{strength.label}</span>
+                </div>
+              );
+            })()}
           </div>
           <div className="change-pw-form-group">
             <label htmlFor="cp-confirm">Confirm New Password</label>

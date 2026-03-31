@@ -1,6 +1,6 @@
 import React from 'react';
 import { FiTrendingUp, FiBarChart2, FiAlertTriangle, FiTarget, FiRefreshCw, FiShield, FiActivity, FiGrid } from 'react-icons/fi';
-import { Card, CardHeader, CardBody, PerformanceLineChart, EfficientFrontierChart, CorrelationHeatmap } from '../components';
+import { Card, CardHeader, CardBody, PerformanceLineChart, EfficientFrontierChart, CorrelationHeatmap, HelpIcon } from '../components';
 import { formatPct, formatNum } from './portfolioBuilderUtils';
 
 const ANALYTICS_TABS = [
@@ -18,11 +18,11 @@ const BenchmarkTab = ({ data }) => {
   return (
     <div className="pb-analytics-result">
       <div className="pb-analytics-grid">
-        <div className="pb-analytics-stat"><span className="pb-stat-label">Alpha (ann.)</span><span className="pb-stat-value">{formatPct(data.alpha * 100)}</span></div>
-        <div className="pb-analytics-stat"><span className="pb-stat-label">Beta</span><span className="pb-stat-value">{formatNum(data.beta)}</span></div>
-        <div className="pb-analytics-stat"><span className="pb-stat-label">Tracking Error</span><span className="pb-stat-value">{formatPct(data.tracking_error * 100)}</span></div>
-        <div className="pb-analytics-stat"><span className="pb-stat-label">Info Ratio</span><span className="pb-stat-value">{formatNum(data.information_ratio)}</span></div>
-        <div className="pb-analytics-stat"><span className="pb-stat-label">R²</span><span className="pb-stat-value">{formatNum(data.r_squared)}</span></div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Alpha (ann.) <HelpIcon text="Excess return of the portfolio above the benchmark after adjusting for market risk (beta). Positive alpha indicates outperformance." /></span><span className="pb-stat-value">{formatPct(data.alpha * 100)}</span></div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Beta <HelpIcon text="Sensitivity of portfolio returns to market (benchmark) movements. Beta of 1.0 means the portfolio moves in line with the market; above 1.0 means more volatile." /></span><span className="pb-stat-value">{formatNum(data.beta)}</span></div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Tracking Error <HelpIcon text="Standard deviation of the difference between portfolio and benchmark returns. Lower values mean the portfolio closely follows the benchmark." /></span><span className="pb-stat-value">{formatPct(data.tracking_error * 100)}</span></div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Info Ratio <HelpIcon text="Information Ratio: Alpha divided by Tracking Error. Measures risk-adjusted outperformance vs. benchmark. Values above 0.5 are considered good." /></span><span className="pb-stat-value">{formatNum(data.information_ratio)}</span></div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">R² <HelpIcon text="R-squared: proportion of portfolio return variance explained by the benchmark (0 to 1). Higher R² means the benchmark is a good predictor of portfolio behavior." /></span><span className="pb-stat-value">{formatNum(data.r_squared)}</span></div>
         <div className="pb-analytics-stat"><span className="pb-stat-label">Observations</span><span className="pb-stat-value">{data.n_observations}</span></div>
         <div className="pb-analytics-stat"><span className="pb-stat-label">Portfolio Return</span><span className="pb-stat-value">{formatPct(data.ann_portfolio_return * 100)}</span></div>
         <div className="pb-analytics-stat"><span className="pb-stat-label">Benchmark Return</span><span className="pb-stat-value">{formatPct(data.ann_benchmark_return * 100)}</span></div>
@@ -43,8 +43,8 @@ const BacktestTab = ({ data }) => {
         <div className="pb-analytics-stat"><span className="pb-stat-label">Total Return</span><span className="pb-stat-value">{formatPct(s.total_return_pct)}</span></div>
         <div className="pb-analytics-stat"><span className="pb-stat-label">Ann. Return</span><span className="pb-stat-value">{formatPct(s.annualised_return_pct)}</span></div>
         <div className="pb-analytics-stat"><span className="pb-stat-label">Ann. Volatility</span><span className="pb-stat-value">{formatPct(s.annualised_volatility_pct)}</span></div>
-        <div className="pb-analytics-stat"><span className="pb-stat-label">Sharpe</span><span className="pb-stat-value">{formatNum(s.sharpe_ratio)}</span></div>
-        <div className="pb-analytics-stat"><span className="pb-stat-label">Max Drawdown</span><span className="pb-stat-value">{formatPct(s.max_drawdown_pct)}</span></div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Sharpe <HelpIcon text="Risk-adjusted return: (Return − Risk-Free Rate) ÷ Volatility. Higher is better. Above 1.0 is good; above 2.0 is excellent." /></span><span className="pb-stat-value">{formatNum(s.sharpe_ratio)}</span></div>
+        <div className="pb-analytics-stat"><span className="pb-stat-label">Max Drawdown <HelpIcon text="Largest peak-to-trough decline during the backtest period. Represents the worst-case loss if you bought at the peak and sold at the trough." /></span><span className="pb-stat-value">{formatPct(s.max_drawdown_pct)}</span></div>
         <div className="pb-analytics-stat"><span className="pb-stat-label">Final Value</span><span className="pb-stat-value">${s.final_value?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '—'}</span></div>
         {s.total_transaction_cost > 0 && (
           <div className="pb-analytics-stat"><span className="pb-stat-label">Txn Cost</span><span className="pb-stat-value pb-negative">${s.total_transaction_cost?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
@@ -96,7 +96,7 @@ const RiskDecompTab = ({ data }) => {
         <div className="pb-analytics-stat"><span className="pb-stat-label">Assets Aligned</span><span className="pb-stat-value">{data.n_assets}</span></div>
       </div>
       <table className="pb-analytics-table">
-        <thead><tr><th>Ticker</th><th>Weight</th><th>Marginal CTR</th><th>% of Risk</th></tr></thead>
+        <thead><tr><th>Ticker</th><th>Weight</th><th>Marginal CTR <HelpIcon text="Marginal Contribution to Risk: how much an incremental increase in this position's weight would change total portfolio volatility." /></th><th>% of Risk</th></tr></thead>
         <tbody>
           {(data.assets || []).slice(0, 15).map((a) => (
             <tr key={a.ticker}>
@@ -118,7 +118,7 @@ const DriftTab = ({ data }) => {
     <div className="pb-analytics-result">
       <div className="pb-analytics-grid" style={{ marginBottom: 12 }}>
         <div className="pb-analytics-stat">
-          <span className="pb-stat-label">Drift Score</span>
+          <span className="pb-stat-label">Drift Score <HelpIcon text="Measures how far current portfolio weights have drifted from target allocations due to market movements. Higher scores indicate a greater need to rebalance." /></span>
           <span className="pb-stat-value">{formatNum(data.drift_score, 2)}%</span>
         </div>
         <div className="pb-analytics-stat">
@@ -206,7 +206,7 @@ const AnalyticsPanel = ({
       <div className="pb-analytics-actions">
         {activeTab === 'backtest' && (
           <label className="pb-cost-input-label">
-            Txn Cost
+            Txn Cost <HelpIcon text="Transaction cost in basis points (1 bps = 0.01%). Applied to each rebalance trade. Typical retail: 5–15 bps; institutional: 1–5 bps." />
             <input
               type="number"
               min="0" max="100" step="1"
