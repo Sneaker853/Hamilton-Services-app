@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from sklearn.covariance import LedoitWolf, OAS
-from fastapi import APIRouter, HTTPException, Header, Cookie, Request
+from fastapi import APIRouter, HTTPException, Header, Cookie, Query, Request
 from psycopg2.extras import Json
 
 from db import get_cursor
