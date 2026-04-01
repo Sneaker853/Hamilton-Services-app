@@ -136,7 +136,31 @@
 .dashboard-chart-wrap {
   width: 100%;
   height: 280px;
+  position: relative;
 }
+
+.dashboard-chart-loading,
+.dashboard-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.dashboard-perf-summary {
+  display: flex;
+  gap: 20px;
+  padding: 10px 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  border-top: 1px solid rgba(100, 116, 139, 0.15);
+  margin-top: 12px;
+}
+
+.dashboard-perf-summary .positive { color: #22d3ee; }
+.dashboard-perf-summary .negative { color: #ef5350; }
 
 .dashboard-two-col {
   display: grid;

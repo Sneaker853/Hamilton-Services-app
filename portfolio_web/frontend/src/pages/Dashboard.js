@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import {
@@ -7,9 +7,9 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  AreaChart,
-  Area,
+  LineChart,
   Line,
+  ReferenceLine,
 } from 'recharts';
 import {
   FiArrowRight,
@@ -23,11 +23,11 @@ import {
 import { HelpIcon } from '../components';
 import './Dashboard.css';
 
-const PERIODS = [
-  { key: '1M', points: 8, benchmarkReturn: 0.012 },
-  { key: '3M', points: 10, benchmarkReturn: 0.03 },
-  { key: '6M', points: 12, benchmarkReturn: 0.05 },
-  { key: '1Y', points: 12, benchmarkReturn: 0.09 },
+const PERIOD_MONTHS = [
+  { key: '1M', months: 1 },
+  { key: '3M', months: 3 },
+  { key: '6M', months: 6 },
+  { key: '1Y', months: 12 },
 ];
 
 const asNumber = (value, fallback = 0) => {
@@ -48,27 +48,6 @@ const formatPercent = (value, digits = 2) => {
   const amount = asNumber(value, 0);
   const sign = amount > 0 ? '+' : '';
   return `${sign}${amount.toFixed(digits)}%`;
-};
-
-const buildTrendSeries = (periodKey, totalInvested, totalCurrentValue) => {
-  const period = PERIODS.find((item) => item.key === periodKey) || PERIODS[1];
-  const labels = Array.from({ length: period.points }, (_, index) => `${index + 1}`);
-  const start = totalInvested > 0 ? totalInvested : Math.max(totalCurrentValue, 1);
-  const end = totalCurrentValue > 0 ? totalCurrentValue : start;
-  const benchmarkEnd = start * (1 + period.benchmarkReturn);
-
-  return labels.map((label, index) => {
-    const progress = period.points === 1 ? 1 : index / (period.points - 1);
-    const smooth = progress + Math.sin(progress * Math.PI) * 0.04;
-    const portfolioValue = start + (end - start) * smooth;
-    const benchmarkValue = start + (benchmarkEnd - start) * progress;
-
-    return {
-      label,
-      portfolio: Math.round(portfolioValue),
-      benchmark: Math.round(benchmarkValue),
-    };
-  });
 };
 
 const normalizeSavedPortfolio = (portfolio) => {
@@ -150,6 +129,8 @@ const Dashboard = ({ apiBase }) => {
   const [savedPortfolios, setSavedPortfolios] = useState([]);
   const [savedLoading, setSavedLoading] = useState(false);
   const [period, setPeriod] = useState('6M');
+  const [perfData, setPerfData] = useState(null);
+  const [perfLoading, setPerfLoading] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -185,6 +166,29 @@ const Dashboard = ({ apiBase }) => {
     fetchSaved();
   }, [apiBase]);
 
+  const fetchPerformance = useCallback(async (months) => {
+    const authUser = localStorage.getItem('authUser');
+    if (!authUser) return;
+    setPerfLoading(true);
+    try {
+      const res = await axios.get(`${apiBase}/dashboard-performance`, {
+        params: { months },
+        withCredentials: true,
+      });
+      setPerfData(res.data);
+    } catch (err) {
+      console.error('Error fetching dashboard performance:', err);
+      setPerfData(null);
+    } finally {
+      setPerfLoading(false);
+    }
+  }, [apiBase]);
+
+  useEffect(() => {
+    const pm = PERIOD_MONTHS.find((p) => p.key === period);
+    fetchPerformance(pm ? pm.months : 6);
+  }, [period, fetchPerformance]);
+
   const normalizedPortfolios = useMemo(
     () => savedPortfolios.map(normalizeSavedPortfolio),
     [savedPortfolios]
@@ -212,10 +216,7 @@ const Dashboard = ({ apiBase }) => {
     };
   }, [normalizedPortfolios]);
 
-  const trendSeries = useMemo(
-    () => buildTrendSeries(period, portfolioMetrics.totalInvested, portfolioMetrics.totalCurrentValue),
-    [period, portfolioMetrics.totalInvested, portfolioMetrics.totalCurrentValue]
-  );
+  const trendSeries = perfData?.series || [];
 
   const topHoldings = useMemo(
     () => aggregateTopHoldings(normalizedPortfolios, portfolioMetrics.totalInvested),
@@ -329,10 +330,10 @@ const Dashboard = ({ apiBase }) => {
         <div className="dashboard-section-head">
           <div>
             <h3>Performance</h3>
-            <p>Portfolio vs S&P 500 benchmark</p>
+            <p>Combined portfolio value vs S&P 500 (SPY)</p>
           </div>
           <div className="dashboard-period-controls">
-            {PERIODS.map((item) => (
+            {PERIOD_MONTHS.map((item) => (
               <button
                 key={item.key}
                 type="button"
@@ -346,43 +347,78 @@ const Dashboard = ({ apiBase }) => {
         </div>
 
         <div className="dashboard-chart-wrap">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={trendSeries} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.2} />
-                  <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="rgba(100, 116, 139, 0.2)" strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <YAxis
-                tick={{ fontSize: 11, fill: '#64748b' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(value) => `$${Math.round(value / 1000)}k`}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: 'rgba(13, 19, 33, 0.95)',
-                  border: '1px solid rgba(100, 116, 139, 0.25)',
-                  borderRadius: 10,
-                  color: '#e2e8f0',
-                }}
-                formatter={(value) => formatCurrency(value)}
-              />
-              <Area
-                type="monotone"
-                dataKey="portfolio"
-                stroke="#22d3ee"
-                strokeWidth={2}
-                fill="url(#portfolioGrad)"
-                dot={false}
-              />
-              <Line type="monotone" dataKey="benchmark" stroke="#64748b" strokeWidth={1.6} dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
+          {perfLoading && <div className="dashboard-chart-loading">Loading performance data...</div>}
+          {!perfLoading && trendSeries.length === 0 && (
+            <div className="dashboard-chart-empty">
+              <p>No performance data available. Save a portfolio to start tracking.</p>
+            </div>
+          )}
+          {!perfLoading && trendSeries.length > 0 && (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendSeries} margin={{ top: 8, right: 12, left: 10, bottom: 0 }}>
+                <CartesianGrid stroke="rgba(100, 116, 139, 0.15)" strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(d) => {
+                    if (!d) return '';
+                    const parts = d.split('-');
+                    return parts.length >= 2 ? `${parts[1]}/${parts[2] || ''}` : d;
+                  }}
+                  interval="preserveStartEnd"
+                  minTickGap={40}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => {
+                    if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+                    if (v >= 1000) return `$${(v / 1000).toFixed(0)}k`;
+                    return `$${v}`;
+                  }}
+                  domain={['auto', 'auto']}
+                  width={65}
+                />
+                {perfData?.total_invested > 0 && (
+                  <ReferenceLine
+                    y={perfData.total_invested}
+                    stroke="rgba(148,163,184,0.4)"
+                    strokeDasharray="4 4"
+                    label={{ value: 'Invested', fill: '#64748b', fontSize: 10, position: 'insideTopRight' }}
+                  />
+                )}
+                <Tooltip
+                  contentStyle={{
+                    background: 'rgba(13, 19, 33, 0.95)',
+                    border: '1px solid rgba(100, 116, 139, 0.25)',
+                    borderRadius: 10,
+                    color: '#e2e8f0',
+                  }}
+                  formatter={(value, name) => [formatCurrency(value), name === 'portfolio' ? 'Your Portfolios' : 'S&P 500']}
+                  labelFormatter={(d) => d}
+                />
+                <Line type="monotone" dataKey="portfolio" name="portfolio" stroke="#22d3ee" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="sp500" name="sp500" stroke="#64748b" strokeWidth={1.8} dot={false} strokeDasharray="5 3" />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
+        {perfData && !perfLoading && trendSeries.length > 0 && (
+          <div className="dashboard-perf-summary">
+            <span className={perfData.portfolio_return_pct >= 0 ? 'positive' : 'negative'}>
+              Portfolio: {formatPercent(perfData.portfolio_return_pct)}
+            </span>
+            <span className={perfData.sp500_return_pct >= 0 ? 'positive' : 'negative'}>
+              S&P 500: {formatPercent(perfData.sp500_return_pct)}
+            </span>
+            <span className={(perfData.portfolio_return_pct - perfData.sp500_return_pct) >= 0 ? 'positive' : 'negative'}>
+              Alpha: {formatPercent(perfData.portfolio_return_pct - perfData.sp500_return_pct)}
+            </span>
+          </div>
+        )}
       </section>
 
       <div className="dashboard-two-col">

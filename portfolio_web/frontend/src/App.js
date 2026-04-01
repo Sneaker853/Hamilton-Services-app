@@ -81,6 +81,7 @@ const shouldSendCredentials = (requestUrl) => {
     || url.includes('/alerts')
     || url.includes('/goals')
     || url.includes('/portfolio-performance')
+    || url.includes('/dashboard-performance')
   );
 };
 

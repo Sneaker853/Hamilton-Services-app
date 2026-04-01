@@ -2507,6 +2507,192 @@ async def get_portfolio_performance(
 
 
 # ---------------------------------------------------------------------------
+# Aggregate Dashboard Performance — all portfolios vs S&P 500
+# ---------------------------------------------------------------------------
+
+@router.get("/api/dashboard-performance")
+async def get_dashboard_performance(
+    months: int = Query(6, ge=1, le=12),
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Compute aggregate actual performance of all saved portfolios vs SPY (S&P 500).
+
+    Returns a time series of the combined portfolio value and SPY benchmark value,
+    both starting from the total invested amount on the earliest portfolio creation date.
+    """
+    from security import get_user_from_token, resolve_auth_token
+    import pandas as pd
+    from datetime import timedelta
+
+    user = get_user_from_token(resolve_auth_token(x_auth_token, session_cookie))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    try:
+        with get_cursor(dict_cursor=True) as (_, cur):
+            cur.execute(
+                "SELECT id, data, created_at FROM saved_portfolios WHERE user_id = %s ORDER BY created_at ASC",
+                (user["id"],),
+            )
+            all_portfolios = cur.fetchall()
+
+            if not all_portfolios:
+                return {"series": [], "total_invested": 0, "current_value": 0, "sp500_value": 0}
+
+            # Parse each portfolio's holdings and compute per-portfolio info
+            portfolio_infos = []
+            all_tickers = set()
+            for port in all_portfolios:
+                pdata = port["data"]
+                if isinstance(pdata, str):
+                    import json as _json
+                    pdata = _json.loads(pdata)
+
+                holdings = pdata.get("holdings", [])
+                if not holdings:
+                    continue
+
+                investment = float(pdata.get("investment_amount", 0))
+                if investment <= 0:
+                    investment = sum(float(h.get("value", 0)) for h in holdings)
+                if investment <= 0:
+                    investment = 10000.0
+
+                tickers = [h["ticker"] for h in holdings if h.get("ticker")]
+                total_weight = sum(float(h.get("weight", 0)) for h in holdings)
+                weights = {}
+                for h in holdings:
+                    t = h.get("ticker")
+                    if t and total_weight > 0:
+                        weights[t] = float(h.get("weight", 0)) / total_weight
+
+                created = port["created_at"]
+                if hasattr(created, "date"):
+                    created = created.date()
+
+                portfolio_infos.append({
+                    "investment": investment,
+                    "tickers": tickers,
+                    "weights": weights,
+                    "created_date": created,
+                })
+                all_tickers.update(tickers)
+
+            if not portfolio_infos:
+                return {"series": [], "total_invested": 0, "current_value": 0, "sp500_value": 0}
+
+            # Determine date range: use the months param back from today
+            from datetime import date as date_type
+            end_date = date_type.today()
+            start_date = end_date - timedelta(days=months * 30)
+
+            # Use the earliest portfolio creation as an alternative start if all portfolios are newer
+            earliest_created = min(p["created_date"] for p in portfolio_infos)
+            if earliest_created > start_date:
+                start_date = earliest_created
+
+            all_tickers_list = list(all_tickers)
+            all_tickers_list.append("SPY")  # Always include SPY for benchmark
+
+            cur.execute(
+                """
+                SELECT date, ticker, close FROM price_history
+                WHERE ticker = ANY(%s) AND date >= %s
+                ORDER BY date ASC
+                """,
+                (all_tickers_list, start_date),
+            )
+            rows = cur.fetchall()
+
+        if not rows:
+            return {"series": [], "total_invested": 0, "current_value": 0, "sp500_value": 0}
+
+        pdf = pd.DataFrame(rows)
+        pivot = pdf.pivot_table(index="date", columns="ticker", values="close", aggfunc="last")
+        pivot = pivot.sort_index().ffill().bfill()
+
+        if pivot.empty:
+            return {"series": [], "total_invested": 0, "current_value": 0, "sp500_value": 0}
+
+        # Build aggregate portfolio value for each date
+        total_invested = sum(p["investment"] for p in portfolio_infos)
+        dates = pivot.index.tolist()
+
+        series = []
+        for date in dates:
+            row = pivot.loc[date]
+
+            # Sum each portfolio's actual value on this date
+            agg_value = 0.0
+            for pinfo in portfolio_infos:
+                # Only include portfolio if it was created on or before this date
+                if pinfo["created_date"] > (date.date() if hasattr(date, "date") else date):
+                    # Portfolio not yet created — add its investment at face value
+                    agg_value += pinfo["investment"]
+                    continue
+
+                # Get base prices for this portfolio (first date on or after creation)
+                port_base_date = None
+                for d in dates:
+                    d_date = d.date() if hasattr(d, "date") else d
+                    if d_date >= pinfo["created_date"]:
+                        port_base_date = d
+                        break
+                if port_base_date is None:
+                    agg_value += pinfo["investment"]
+                    continue
+
+                base_row = pivot.loc[port_base_date]
+                port_val = 0.0
+                for t in pinfo["tickers"]:
+                    if t in row.index and t in base_row.index:
+                        base_price = float(base_row[t]) if pd.notna(base_row[t]) else 0
+                        cur_price = float(row[t]) if pd.notna(row[t]) else 0
+                        if base_price > 0:
+                            port_val += pinfo["weights"].get(t, 0) * (cur_price / base_price)
+                        else:
+                            port_val += pinfo["weights"].get(t, 0)
+                    else:
+                        port_val += pinfo["weights"].get(t, 0)
+
+                agg_value += port_val * pinfo["investment"]
+
+            # SPY benchmark: invest total_invested at SPY on start_date, track growth
+            spy_value = total_invested
+            if "SPY" in row.index and "SPY" in pivot.loc[dates[0]].index:
+                spy_base = float(pivot.loc[dates[0]]["SPY"])
+                spy_cur = float(row["SPY"]) if pd.notna(row["SPY"]) else spy_base
+                if spy_base > 0:
+                    spy_value = total_invested * (spy_cur / spy_base)
+
+            date_str = date.isoformat() if hasattr(date, "isoformat") else str(date)
+            series.append({
+                "date": date_str,
+                "portfolio": round(agg_value, 2),
+                "sp500": round(spy_value, 2),
+            })
+
+        current_value = series[-1]["portfolio"] if series else total_invested
+        sp500_value = series[-1]["sp500"] if series else total_invested
+
+        return {
+            "total_invested": round(total_invested, 2),
+            "current_value": round(current_value, 2),
+            "sp500_value": round(sp500_value, 2),
+            "portfolio_return_pct": round((current_value / total_invested - 1) * 100, 2) if total_invested > 0 else 0,
+            "sp500_return_pct": round((sp500_value / total_invested - 1) * 100, 2) if total_invested > 0 else 0,
+            "series": series,
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error computing dashboard performance")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
 # Goals & Targets with Auto-Rebalancing Suggestions
 # ---------------------------------------------------------------------------
 
