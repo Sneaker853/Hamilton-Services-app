@@ -135,7 +135,7 @@ function AppContent() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const location = useLocation();
   const theme = useThemeStore(state => state.theme);
-  const { lang, setLang, t } = useLanguage();
+  const { lang, setLang, t, tt } = useLanguage();
 
   // Initialize theme on mount
   useEffect(() => {
@@ -300,7 +300,7 @@ function AppContent() {
             {!sidebarCollapsed && (
               <div className="shell-brand-text">
                 <strong>Hamilton Services</strong>
-                <small>{tt('ANALYTICS')}YTICS')}</small>
+                <small>{tt('ANALYTICS')}</small>
               </div>
             )}
           </Link>
@@ -368,13 +368,13 @@ function AppContent() {
             <img src={logoPlaceholder} alt="Logo" className="shell-logo-image" />
             <div className="shell-brand-text">
               <strong>Hamilton Services</strong>
-              <small>ANALYTICS</small>
+              <small>{tt('ANALYTICS')}</small>
             </div>
           </Link>
           <button
             className="shell-icon-btn mobile"
             onClick={() => setMobileNavOpen(false)}
-            aria-label="Close mobile navigation"
+            aria-label={tt('Close mobile navigation')}
           >
             <FiX />
           </button>
