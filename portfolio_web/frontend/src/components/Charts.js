@@ -14,6 +14,7 @@ import {
   ZAxis,
   Legend
 } from 'recharts';
+import { useLanguage } from './LanguageContext';
 
 const EmptyChart = ({ title, message }) => (
   <div style={{
@@ -38,11 +39,12 @@ const formatNumber = (value) => {
 };
 
 export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => {
+  const { tt } = useLanguage();
   const hasProjected = data && data.length > 0;
   const hasHistorical = historicalData && historicalData.length > 0;
 
   if (!hasProjected && !hasHistorical) {
-    return <EmptyChart title="Performance" message="No performance history yet" />;
+    return <EmptyChart title={tt('Performance')} message={tt('No performance history yet')} />;
   }
 
   // When both series exist, merge them on a shared timeline
@@ -83,7 +85,7 @@ export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => 
 
     return (
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={merged} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label="Performance chart showing historical and projected portfolio value over time">
+        <LineChart data={merged} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label={tt('Performance chart showing historical and projected portfolio value over time')}>
           <CartesianGrid stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="3 3" />
           <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
           <YAxis stroke="#94a3b8" fontSize={11} />
@@ -92,7 +94,7 @@ export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => 
           <Line
             type="monotone"
             dataKey="historical"
-            name="Historical"
+            name={tt('Historical')}
             stroke="#22d3ee"
             strokeWidth={2.5}
             dot={false}
@@ -102,7 +104,7 @@ export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => 
           <Line
             type="monotone"
             dataKey="projected"
-            name="Projected"
+            name={tt('Projected')}
             stroke="#a78bfa"
             strokeWidth={2}
             strokeDasharray="6 3"
@@ -119,7 +121,7 @@ export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => 
   if (hasHistorical) {
     return (
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={historicalData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label="Historical portfolio performance chart">
+        <LineChart data={historicalData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label={tt('Historical portfolio performance chart')}>
           <CartesianGrid stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="3 3" />
           <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
           <YAxis stroke="#94a3b8" fontSize={11} />
@@ -128,7 +130,7 @@ export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => 
           <Line
             type="monotone"
             dataKey="value"
-            name="Historical"
+            name={tt('Historical')}
             stroke="#22d3ee"
             strokeWidth={2.5}
             dot={false}
@@ -142,7 +144,7 @@ export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => 
   // Projected only (fallback — no historical data available)
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label="Projected portfolio performance chart">
+      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label={tt('Projected portfolio performance chart')}>
         <CartesianGrid stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="3 3" />
         <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
         <YAxis stroke="#94a3b8" fontSize={11} />
@@ -151,7 +153,7 @@ export const PerformanceLineChart = ({ data, historicalData, height = 260 }) => 
         <Line
           type="monotone"
           dataKey="value"
-          name="Projected"
+          name={tt('Projected')}
           stroke="#a78bfa"
           strokeWidth={2}
           strokeDasharray="6 3"
@@ -238,8 +240,9 @@ const interpolateFrontier = (points, resolution = 120) => {
 };
 
 export const EfficientFrontierChart = ({ data, height = 260 }) => {
+  const { tt } = useLanguage();
   if (!data || data.length === 0) {
-    return <EmptyChart title="Efficient Frontier" message="Add more holdings to generate a frontier" />;
+    return <EmptyChart title={tt('Efficient Frontier')} message={tt('Add more holdings to generate a frontier')} />;
   }
 
   // Sort by return (low → high) so the hyperbola traces correctly:
@@ -271,27 +274,27 @@ export const EfficientFrontierChart = ({ data, height = 260 }) => {
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <ComposedChart data={smoothCurve} margin={{ top: 10, right: 10, left: 0, bottom: 20 }} role="img" aria-label="Efficient frontier chart showing optimal risk-return tradeoff curve">
+      <ComposedChart data={smoothCurve} margin={{ top: 10, right: 10, left: 0, bottom: 20 }} role="img" aria-label={tt('Efficient frontier chart showing optimal risk-return tradeoff curve')}>
         <CartesianGrid stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="3 3" />
         <XAxis
           type="number"
           dataKey="risk"
-          name="Risk (%)"
+          name={tt('Risk (%)')}
           stroke="#94a3b8"
           fontSize={11}
           tickFormatter={(v) => `${formatNumber(v)}%`}
           domain={['dataMin - 1', 'dataMax + 1']}
-          label={{ value: 'Risk (%)', position: 'insideBottom', offset: -5, fill: '#94a3b8', fontSize: 12, fontWeight: 600 }}
+          label={{ value: tt('Risk (%)'), position: 'insideBottom', offset: -5, fill: '#94a3b8', fontSize: 12, fontWeight: 600 }}
         />
         <YAxis
           type="number"
           dataKey="return"
-          name="Return (%)"
+          name={tt('Return (%)')}
           stroke="#94a3b8"
           fontSize={11}
           tickFormatter={(v) => `${formatNumber(v)}%`}
           domain={['dataMin - 1', 'dataMax + 2']}
-          label={{ value: 'Return (%)', angle: -90, position: 'insideLeft', offset: 10, fill: '#94a3b8', fontSize: 12, fontWeight: 600 }}
+          label={{ value: tt('Return (%)'), angle: -90, position: 'insideLeft', offset: 10, fill: '#94a3b8', fontSize: 12, fontWeight: 600 }}
         />
         <Tooltip content={<CustomFrontierTooltip />} cursor={{ strokeDasharray: '3 3', stroke: 'rgba(148, 163, 184, 0.3)' }} />
         <Line
@@ -319,18 +322,19 @@ export const EfficientFrontierChart = ({ data, height = 260 }) => {
 };
 
 export const RiskReturnScatter = ({ data, height = 260 }) => {
+  const { tt } = useLanguage();
   if (!data || data.length === 0) {
-    return <EmptyChart title="Risk vs Return" message="No holdings to plot" />;
+    return <EmptyChart title={tt('Risk vs Return')} message={tt('No holdings to plot')} />;
   }
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <ScatterChart margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label="Scatter plot showing risk versus expected return for each holding">
+      <ScatterChart margin={{ top: 10, right: 10, left: 0, bottom: 0 }} role="img" aria-label={tt('Scatter plot showing risk versus expected return for each holding')}>
         <CartesianGrid stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="3 3" />
         <XAxis
           type="number"
           dataKey="risk"
-          name="Risk (%)"
+          name={tt('Risk (%)')}
           stroke="#94a3b8"
           fontSize={11}
           tickFormatter={(value) => `${formatNumber(value)}%`}
@@ -339,7 +343,7 @@ export const RiskReturnScatter = ({ data, height = 260 }) => {
         <YAxis
           type="number"
           dataKey="return"
-          name="Return (%)"
+          name={tt('Return (%)')}
           stroke="#94a3b8"
           fontSize={11}
           tickFormatter={(value) => `${formatNumber(value)}%`}
@@ -356,10 +360,10 @@ export const RiskReturnScatter = ({ data, height = 260 }) => {
           }}
           labelStyle={{ color: '#f8fafc', fontWeight: 600 }}
           itemStyle={{ color: '#cbd5e1' }}
-          labelFormatter={(_, payload) => payload?.[0]?.payload?.name || 'Asset'}
+          labelFormatter={(_, payload) => payload?.[0]?.payload?.name || tt('Asset')}
           formatter={(value, name) => {
             if (!Number.isFinite(Number(value))) return [value, name];
-            if (name === 'weight') return [`${formatNumber(value)}%`, 'Weight'];
+            if (name === 'weight') return [`${formatNumber(value)}%`, tt('Weight')];
             return [`${formatNumber(value)}%`, name];
           }}
         />
@@ -378,12 +382,13 @@ const getHeatColor = (value) => {
 };
 
 export const CorrelationHeatmap = ({ matrix, labels }) => {
+  const { tt } = useLanguage();
   if (!matrix || matrix.length === 0 || !labels || labels.length === 0) {
-    return <EmptyChart title="Correlation Heatmap" message="No correlation data available" />;
+    return <EmptyChart title={tt('Correlation Heatmap')} message={tt('No correlation data available')} />;
   }
 
   return (
-    <div style={{ overflow: 'auto', maxHeight: '460px', width: '100%', paddingBottom: '4px' }} role="img" aria-label="Correlation heatmap showing pairwise correlations between portfolio holdings">
+    <div style={{ overflow: 'auto', maxHeight: '460px', width: '100%', paddingBottom: '4px' }} role="img" aria-label={tt('Correlation heatmap showing pairwise correlations between portfolio holdings')}>
       <div style={{ display: 'grid', gridTemplateColumns: `120px repeat(${labels.length}, 40px)`, gap: '6px', width: 'max-content', minWidth: '100%' }}>
         <div />
         {labels.map((label) => (

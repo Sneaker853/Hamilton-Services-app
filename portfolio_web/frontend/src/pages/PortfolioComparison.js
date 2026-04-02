@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { FiCheck } from 'react-icons/fi';
-import { HelpIcon } from '../components';
+import { HelpIcon, useLanguage } from '../components';
 import { downloadCsv } from '../utils/exportCsv';
 import './PortfolioComparison.css';
 
@@ -45,12 +45,17 @@ const extractMetrics = (portfolio) => {
     .sort((a, b) => asNumber(b.weight) - asNumber(a.weight))
     .slice(0, 5);
 
+  const estimatedCurrentValue = investment * (1 + expectedReturn / 100);
+  const gainLossPct = expectedReturn; // already in % per year
+
   return {
     name: portfolio.name || 'Unnamed',
     source: portfolio.source || 'manual',
     createdAt: portfolio.created_at,
     holdingsCount: holdings.length,
     investment,
+    estimatedCurrentValue,
+    gainLossPct,
     expectedReturn: Math.abs(expectedReturn) > 1.5 ? expectedReturn : expectedReturn * 100,
     volatility: Math.abs(volatility) > 1.5 ? volatility : volatility * 100,
     sharpe,
@@ -60,8 +65,11 @@ const extractMetrics = (portfolio) => {
 };
 
 const METRIC_ROWS = [
+  { key: 'createdAt', label: 'Date Created', format: (v) => v ? new Date(v).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A' },
   { key: 'holdingsCount', label: 'Holdings', format: (v) => v },
   { key: 'investment', label: 'Investment', format: formatCurrency },
+  { key: 'estimatedCurrentValue', label: 'Est. Current Value', format: formatCurrency, help: 'Investment amount plus one year of model-projected return.' },
+  { key: 'gainLossPct', label: 'Projected Gain/Loss', format: (v) => formatPct(v, 1), help: 'Expected annual gain or loss as a percentage of the original investment.' },
   { key: 'expectedReturn', label: 'Expected Return', format: (v) => formatPct(v), help: 'Annualized expected return from the FF5 factor model.' },
   { key: 'volatility', label: 'Volatility', format: (v) => formatPct(v, 1), help: 'Annualized standard deviation of portfolio returns.' },
   { key: 'sharpe', label: 'Sharpe Ratio', format: (v) => v.toFixed(2), help: 'Risk-adjusted return: (Return − Rf) ÷ Volatility.' },
@@ -69,6 +77,7 @@ const METRIC_ROWS = [
 ];
 
 const PortfolioComparison = ({ apiBase }) => {
+  const { tt } = useLanguage();
   const [portfolios, setPortfolios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState([]);
@@ -129,7 +138,7 @@ const PortfolioComparison = ({ apiBase }) => {
       <div className="page-container comparison-root">
         <div className="page-header">
           <h1>Portfolio Comparison</h1>
-          <p className="page-subtitle">Loading portfolios…</p>
+          <p className="page-subtitle">{tt('Loading portfolios...')}</p>
         </div>
       </div>
     );
@@ -138,16 +147,16 @@ const PortfolioComparison = ({ apiBase }) => {
   return (
     <div className="page-container comparison-root">
       <div className="page-header">
-        <h1>Portfolio Comparison</h1>
+        <h1>{tt('Portfolio Comparison')}</h1>
         <p className="page-subtitle">
-          Select 2 or more saved portfolios to compare side-by-side
+          {tt('Select 2 or more saved portfolios to compare side-by-side')}
         </p>
       </div>
 
       {/* Portfolio selector */}
       <div className="comparison-selector">
         {portfolios.length === 0 && (
-          <p className="comparison-empty">No saved portfolios. Create and save a portfolio first.</p>
+          <p className="comparison-empty">{tt('No saved portfolios. Create and save a portfolio first.')}</p>
         )}
         {portfolios.map((p) => {
           const isSelected = selected.includes(p.id);
@@ -170,14 +179,14 @@ const PortfolioComparison = ({ apiBase }) => {
         <>
           <div className="comparison-actions">
             <button className="comparison-export-btn" onClick={handleExportComparison}>
-              Export Comparison CSV
+              {tt('Export Comparison CSV')}
             </button>
           </div>
           <div className="comparison-table-wrap">
             <table className="comparison-table">
               <thead>
                 <tr>
-                  <th className="comparison-label-col">Metric</th>
+                  <th className="comparison-label-col">{tt('Metric')}</th>
                   {comparedPortfolios.map((p, i) => (
                     <th key={i}>
                       <div className="comparison-col-head">
@@ -211,7 +220,7 @@ const PortfolioComparison = ({ apiBase }) => {
                 })}
                 {/* Top sectors */}
                 <tr>
-                  <td className="comparison-label-col">Top Sectors</td>
+                  <td className="comparison-label-col">{tt('Top Sectors')}</td>
                   {comparedPortfolios.map((p, i) => (
                     <td key={i}>
                       {p.topSectors.map(([name, weight]) => (
@@ -225,7 +234,7 @@ const PortfolioComparison = ({ apiBase }) => {
                 </tr>
                 {/* Top holdings */}
                 <tr>
-                  <td className="comparison-label-col">Top Holdings</td>
+                  <td className="comparison-label-col">{tt('Top Holdings')}</td>
                   {comparedPortfolios.map((p, i) => (
                     <td key={i}>
                       {p.topHoldings.map((h) => (
@@ -244,7 +253,7 @@ const PortfolioComparison = ({ apiBase }) => {
       )}
 
       {selected.length === 1 && (
-        <p className="comparison-hint">Select at least one more portfolio to compare.</p>
+        <p className="comparison-hint">{tt('Select at least one more portfolio to compare.')}</p>
       )}
     </div>
   );

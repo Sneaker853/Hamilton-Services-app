@@ -1,6 +1,7 @@
 import React from 'react';
 import { FiBarChart2, FiPieChart } from 'react-icons/fi';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useLanguage } from '../components';
 import {
   Card,
   CardHeader,
@@ -23,14 +24,16 @@ const ChartsPanel = ({
   showPerformance = true,
   showRiskReturn = true,
   className = ''
-}) => (
+}) => {
+  const { tt } = useLanguage();
+  return (
   <div className={`pb-chart-grid ${className}`.trim()}>
     {showSector && sectorData.length > 0 && (
       <Card variant="default">
         <CardHeader>
           <div className="pb-chart-title-row">
             <FiBarChart2 size={18} className="pb-icon-cyan" />
-            <h3 className="pb-sub-title">Sector Distribution</h3>
+            <h3 className="pb-sub-title">{tt('Sector Distribution')}</h3>
           </div>
         </CardHeader>
         <CardBody>
@@ -67,7 +70,7 @@ const ChartsPanel = ({
         <CardHeader>
           <div className="pb-chart-title-row">
             <FiPieChart size={18} className="pb-icon-cyan" />
-            <h3 className="pb-sub-title">Asset Allocation</h3>
+            <h3 className="pb-sub-title">{tt('Asset Allocation')}</h3>
           </div>
         </CardHeader>
         <CardBody>
@@ -104,9 +107,9 @@ const ChartsPanel = ({
       <CardHeader>
         <div className="pb-chart-title-row">
           <FiBarChart2 size={18} className="pb-icon-cyan" />
-          <h3 className="pb-sub-title">Performance Over Time</h3>
+          <h3 className="pb-sub-title">{tt('Performance Over Time')}</h3>
           <span className={`pb-model-badge ${historicalPerformance ? 'backend' : 'fallback'}`}>
-            {historicalPerformance ? 'Historical + Projected' : 'Projected only'}
+            {historicalPerformance ? tt('Historical + Projected') : tt('Projected only')}
           </span>
         </div>
       </CardHeader>
@@ -121,11 +124,11 @@ const ChartsPanel = ({
         <CardHeader>
           <div className="pb-chart-title-row">
             <FiBarChart2 size={18} className="pb-icon-cyan" />
-            <h3 className="pb-sub-title">Risk vs Return</h3>
+            <h3 className="pb-sub-title">{tt('Risk vs Return')}</h3>
             <span className={`pb-model-badge ${isBackendFrontierActive ? 'backend' : 'fallback'}`}>
               {isBackendFrontierActive
-                ? 'Advanced covariance model'
-                : 'Estimated model'}
+                ? tt('Advanced covariance model')
+                : tt('Estimated model')}
             </span>
           </div>
         </CardHeader>
@@ -135,6 +138,7 @@ const ChartsPanel = ({
       </Card>
     )}
   </div>
-);
+  );
+};
 
 export default ChartsPanel;

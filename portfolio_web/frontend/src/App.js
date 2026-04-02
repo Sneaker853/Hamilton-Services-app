@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
@@ -28,6 +28,7 @@ import { RiScales3Line } from 'react-icons/ri';
 
 // Theme
 import { useThemeStore, applyTheme } from './components/ThemeContext';
+import { LanguageProvider, useLanguage } from './components';
 
 // Pages
 import Dashboard from './pages/Dashboard';
@@ -134,6 +135,7 @@ function AppContent() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const location = useLocation();
   const theme = useThemeStore(state => state.theme);
+  const { lang, setLang, t } = useLanguage();
 
   // Initialize theme on mount
   useEffect(() => {
@@ -169,20 +171,8 @@ function AppContent() {
             return;
           }
         } catch (_err) {
-        }
-
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            if (parsed?.email) {
-              setAuthUser(parsed);
-              setGuestMode(false);
-              localStorage.removeItem('guestMode');
-              return;
-            }
-          } catch (err) {
-            // corrupted stored user
-          }
+          // Session validation failed — clear stale cached user
+          localStorage.removeItem('authUser');
         }
       }
 
@@ -220,21 +210,21 @@ function AppContent() {
   };
 
   const menuItems = [
-    { path: '/', label: 'Dashboard', icon: FiGrid },
-    { path: '/portfolio', label: 'Optimizer', icon: FiActivity },
-    { path: '/portfolio-builder', label: 'Builder', icon: FiBriefcase },
-    { path: '/market-data', label: 'Market Data', icon: FiBarChart2 },
-    { path: '/compare', label: 'Compare', icon: FiColumns },
-    { path: '/compare-stocks', label: 'Stocks', icon: RiScales3Line },
-    { path: '/watchlist', label: 'Watchlist', icon: FiStar, requiresAuth: true },
-    { path: '/alerts', label: 'Alerts', icon: FiBell, requiresAuth: true },
-    { path: '/performance', label: 'Performance', icon: FiTrendingUp, requiresAuth: true },
-    { path: '/goals', label: 'Goals', icon: FiCrosshair, requiresAuth: true },
-    { path: '/help', label: 'Help', icon: FiHelpCircle },
+    { path: '/', label: t('nav_dashboard'), icon: FiGrid },
+    { path: '/portfolio', label: t('nav_optimizer'), icon: FiActivity },
+    { path: '/portfolio-builder', label: t('nav_builder'), icon: FiBriefcase },
+    { path: '/market-data', label: t('nav_market'), icon: FiBarChart2 },
+    { path: '/compare', label: t('nav_compare'), icon: FiColumns },
+    { path: '/compare-stocks', label: t('nav_stocks'), icon: RiScales3Line },
+    { path: '/watchlist', label: t('nav_watchlist'), icon: FiStar, requiresAuth: true },
+    { path: '/alerts', label: t('nav_alerts'), icon: FiBell, requiresAuth: true },
+    { path: '/performance', label: t('nav_performance'), icon: FiTrendingUp, requiresAuth: true },
+    { path: '/goals', label: t('nav_goals'), icon: FiCrosshair, requiresAuth: true },
+    { path: '/help', label: t('nav_help'), icon: FiHelpCircle },
     { path: '/mission', label: 'Mission', icon: FiInfo },
     { path: '/contact', label: 'Contact', icon: FiMail },
     { path: '/change-password', label: 'Password', icon: FiLock, requiresAuth: true },
-    { path: '/admin', label: 'Admin', icon: FiShield },
+    { path: '/admin', label: t('nav_admin'), icon: FiShield },
   ];
 
   const userInitial = useMemo(() => {
@@ -290,13 +280,13 @@ function AppContent() {
 
   return (
     <div className="shell-app">
-      <a href="#main-content" className="skip-to-main">Skip to main content</a>
+      <a href="#main-content" className="skip-to-main">{tt('Skip to main content')}</a>
       <KeyboardShortcuts />
       {showOnboarding && <OnboardingWizard onClose={() => setShowOnboarding(false)} />}
       <button
         className="shell-mobile-toggle"
         onClick={() => setMobileNavOpen(true)}
-        aria-label="Open navigation"
+        aria-label={tt('Open navigation')}
       >
         <FiMenu />
       </button>
@@ -310,7 +300,7 @@ function AppContent() {
             {!sidebarCollapsed && (
               <div className="shell-brand-text">
                 <strong>Hamilton Services</strong>
-                <small>ANALYTICS</small>
+                <small>{tt('ANALYTICS')}YTICS')}</small>
               </div>
             )}
           </Link>
@@ -318,14 +308,14 @@ function AppContent() {
             <button
               className="shell-icon-btn desktop"
               onClick={() => setSidebarCollapsed((prev) => !prev)}
-              aria-label="Toggle desktop sidebar"
+              aria-label={tt('Toggle desktop sidebar')}
             >
               <FiMenu />
             </button>
             <button
               className="shell-icon-btn mobile"
               onClick={() => setMobileNavOpen(false)}
-              aria-label="Close mobile navigation"
+              aria-label={tt('Close mobile navigation')}
             >
               <FiX />
             </button>
@@ -336,7 +326,7 @@ function AppContent() {
 
         <div className="shell-status-card">
           <span className={`shell-status-dot ${apiHealth}`} />
-          {!sidebarCollapsed && <span>System {apiHealth === 'healthy' ? 'Online' : apiHealth}</span>}
+          {!sidebarCollapsed && <span>{lang === 'fr' ? 'Système' : 'System'} {apiHealth === 'healthy' ? (lang === 'fr' ? 'En ligne' : 'Online') : apiHealth}</span>}
         </div>
 
         <div className="shell-sidebar-footer">
@@ -344,21 +334,29 @@ function AppContent() {
             <div className="shell-user-avatar">{userInitial}</div>
             {!sidebarCollapsed && (
               <div className="shell-user-meta">
-                <span>{authUser?.email || 'Guest user'}</span>
-                <small>{authUser ? 'Signed in' : 'Guest mode'}</small>
+                <span>{authUser?.email || (lang === 'fr' ? 'Invité' : 'Guest user')}</span>
+                <small>{authUser ? (lang === 'fr' ? 'Connecté' : 'Signed in') : (lang === 'fr' ? 'Mode invité' : 'Guest mode')}</small>
               </div>
             )}
           </div>
+          <button
+            className="shell-logout-btn"
+            onClick={() => setLang(lang === 'en' ? 'fr' : 'en')}
+            title={lang === 'en' ? 'Passer en français' : 'Switch to English'}
+          >
+            <FiSettings />
+            {!sidebarCollapsed && <span>{lang === 'en' ? 'FR' : 'EN'}</span>}
+          </button>
           {authUser && (
             <button className="shell-logout-btn" onClick={handleSignOut}>
               <FiLogOut />
-              {!sidebarCollapsed && <span>Sign out</span>}
+              {!sidebarCollapsed && <span>{t('nav_sign_out', 'Sign out')}</span>}
             </button>
           )}
           {!authUser && guestMode && (
             <button className="shell-logout-btn" onClick={handleGuestLogin}>
               <FiLogIn />
-              {!sidebarCollapsed && <span>Log in</span>}
+              {!sidebarCollapsed && <span>{t('nav_sign_in', 'Log in')}</span>}
             </button>
           )}
         </div>
@@ -388,7 +386,7 @@ function AppContent() {
         <header className="shell-topbar">
           <div>
             <h1>{menuItems.find((item) => item.path === location.pathname)?.label || 'Hamilton Services'}</h1>
-            <p>Institutional-grade analytics for modern portfolio management.</p>
+            <p>{tt('Institutional-grade analytics for modern portfolio management.')}</p>
           </div>
           {canAccessAdmin && (
             <button
@@ -426,9 +424,11 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <LanguageProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </LanguageProvider>
   );
 }
 

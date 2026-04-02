@@ -31,6 +31,7 @@
   --success-color: #22c55e;
   --danger-color: #ff4444;
   --warning-color: #f59e0b;
+  --accent-color: #22d3ee;
 }
 
 /* Light Theme */
@@ -56,6 +57,7 @@
   --success-color: #00cc5a;
   --danger-color: #e63946;
   --warning-color: #f77f00;
+  --accent-color: #0099cc;
 }
 
 html, body, #root {

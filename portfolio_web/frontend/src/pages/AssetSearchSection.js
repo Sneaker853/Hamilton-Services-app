@@ -1,6 +1,6 @@
 import React from 'react';
 import { FiSearch } from 'react-icons/fi';
-import { LoadingSkeleton } from '../components';
+import { LoadingSkeleton, useLanguage } from '../components';
 
 const AssetSearchSection = ({
   searchValue,
@@ -18,33 +18,34 @@ const AssetSearchSection = ({
   loading,
   selectedTickers
 }) => {
+  const { tt } = useLanguage();
   const filterOptions = [
-    { value: 'all', label: 'All' },
-    { value: 'stock', label: 'Stocks' },
-    { value: 'etf', label: 'ETFs' },
-    { value: 'bond', label: 'Bonds' },
+    { value: 'all', label: tt('All') },
+    { value: 'stock', label: tt('Stocks') },
+    { value: 'etf', label: tt('ETFs') },
+    { value: 'bond', label: tt('Bonds') },
     { value: 'crypto', label: 'Crypto' },
-    { value: 'commodity', label: 'Commodities' }
+    { value: 'commodity', label: tt('Commodities') }
   ];
 
   return (
     <>
       <div className="pb-step-head pb-search-step-head">
         <span className="pb-step-index">2</span>
-        <h3 className="pb-sub-title">Add Holdings</h3>
+        <h3 className="pb-sub-title">{tt('Add Holdings')}</h3>
       </div>
-      <p className="pb-help-text">Tip: search by ticker or company name, then press Enter to add the highlighted result.</p>
+      <p className="pb-help-text">{tt('Tip: search by ticker or company name, then press Enter to add the highlighted result.')}</p>
       <div className="form-group pb-compact-group">
         <label className="pb-label-row">
           <FiSearch size={14} />
-          Security Search
+          {tt('Security Search')}
         </label>
         {loading ? (
           <LoadingSkeleton height="44px" borderRadius="8px" />
         ) : (
           <input
             type="text"
-            placeholder="Search ticker or security name..."
+            placeholder={tt('Search ticker or security name...')}
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
             className="form-control pb-input-lg"
@@ -67,7 +68,7 @@ const AssetSearchSection = ({
 
       <div className="pb-search-filter-row">
         <label className="pb-search-filter-label" htmlFor="market-filter-select">
-          Market
+          {tt('Market')}
         </label>
         <select
           id="market-filter-select"
@@ -75,14 +76,14 @@ const AssetSearchSection = ({
           value={marketFilter}
           onChange={(event) => onMarketChange(event.target.value)}
         >
-          <option value="all">All Markets</option>
+          <option value="all">{tt('All Markets')}</option>
           {(marketOptions || []).map((market) => (
             <option key={market} value={market}>{market}</option>
           ))}
         </select>
 
         <label className="pb-search-filter-label" htmlFor="financial-sector-filter-select">
-          Sector
+          {tt('Sector')}
         </label>
         <select
           id="financial-sector-filter-select"
@@ -90,7 +91,7 @@ const AssetSearchSection = ({
           value={financialSectorFilter}
           onChange={(event) => onFinancialSectorChange(event.target.value)}
         >
-          <option value="all">All Sectors</option>
+          <option value="all">{tt('All Sectors')}</option>
           {(financialSectorOptions || []).map((sector) => (
             <option key={sector} value={sector.toLowerCase()}>{sector}</option>
           ))}
@@ -110,17 +111,17 @@ const AssetSearchSection = ({
               type="button"
               onClick={() => onSelect(item)}
               className={`pb-security-row ${isSelected ? 'selected' : ''}`}
-              aria-label={`${isSelected ? 'Added' : 'Add'} ${item.ticker} ${item.name || ''}`}
+              aria-label={`${isSelected ? tt('Added') : tt('Add')} ${item.ticker} ${item.name || ''}`}
             >
               <div>
                 <div className="pb-security-ticker">{item.ticker}</div>
                 <div className="pb-security-name">{item.name?.substring(0, 42)}</div>
               </div>
-              <div className="pb-security-mark">{isSelected ? 'Added' : 'Add'}</div>
+              <div className="pb-security-mark">{isSelected ? tt('Added') : tt('Add')}</div>
             </button>
           );
         }) : (
-          <div className="pb-empty-text">No matching securities found</div>
+          <div className="pb-empty-text">{tt('No matching securities found')}</div>
         )}
       </div>
     </>

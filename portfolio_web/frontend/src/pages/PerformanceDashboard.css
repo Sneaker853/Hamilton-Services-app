@@ -1,7 +1,6 @@
 .perf-page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 32px 16px;
+  width: 100%;
+  padding: 40px 36px;
 }
 .perf-header {
   display: flex;
@@ -16,17 +15,17 @@
   align-items: center;
   gap: 10px;
   font-size: 1.5rem;
-  color: #e0e0e0;
+  color: #e2e8f0;
   margin: 0;
 }
 .perf-selector {
   position: relative;
 }
 .perf-selector select {
-  background: #1e2330;
-  border: 1px solid #333;
+  background: rgba(13, 19, 33, 0.7);
+  border: 1px solid rgba(100, 116, 139, 0.3);
   border-radius: 8px;
-  color: #e0e0e0;
+  color: #e2e8f0;
   padding: 8px 32px 8px 12px;
   font-size: 0.9rem;
   appearance: none;
@@ -39,7 +38,7 @@
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
-  color: #888;
+  color: #94a3b8;
 }
 
 .perf-stats {
@@ -51,23 +50,23 @@
 .perf-stat-card {
   flex: 1;
   min-width: 130px;
-  background: #1e2330;
-  border: 1px solid #2a3244;
+  background: rgba(13, 19, 33, 0.6);
+  border: 1px solid rgba(100, 116, 139, 0.2);
   border-radius: 10px;
   padding: 16px;
   text-align: center;
 }
-.perf-stat-card.positive { border-color: #2e7d32; }
-.perf-stat-card.negative { border-color: #c62828; }
+.perf-stat-card.positive { border-color: rgba(34, 197, 94, 0.4); }
+.perf-stat-card.negative { border-color: rgba(239, 68, 68, 0.4); }
 .perf-stat-label {
-  color: #888;
+  color: #94a3b8;
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 6px;
 }
 .perf-stat-value {
-  color: #e0e0e0;
+  color: #e2e8f0;
   font-size: 1.15rem;
   font-weight: 700;
 }
@@ -84,29 +83,29 @@
 
 .perf-stat-note {
   font-size: 0.68rem;
-  color: #666;
+  color: #64748b;
   margin-top: 3px;
   font-style: italic;
 }
 
 .perf-chart-card {
-  background: #1e2330;
-  border: 1px solid #2a3244;
+  background: rgba(13, 19, 33, 0.6);
+  border: 1px solid rgba(100, 116, 139, 0.2);
   border-radius: 10px;
   padding: 20px;
 }
 .perf-chart-card h3 {
   margin: 0 0 4px 0;
-  color: #e0e0e0;
+  color: #e2e8f0;
   font-size: 1.1rem;
 }
 .perf-chart-sub {
-  color: #888;
+  color: #94a3b8;
   font-size: 0.82rem;
   margin: 0 0 6px 0;
 }
 .perf-chart-note {
-  color: #666;
+  color: #64748b;
   font-size: 0.75rem;
   margin: 0 0 16px 0;
   line-height: 1.5;
@@ -117,19 +116,20 @@
 
 .perf-empty {
   text-align: center;
-  color: #888;
+  color: #94a3b8;
   padding: 60px 20px;
 }
 .perf-empty p { margin: 8px 0; }
 .perf-error {
-  background: #3a1c1c;
+  background: rgba(198, 40, 40, 0.15);
   color: #ff8a80;
   padding: 12px 16px;
   border-radius: 8px;
+  border: 1px solid rgba(198, 40, 40, 0.3);
 }
 .perf-loading {
   text-align: center;
-  color: #888;
+  color: #94a3b8;
   padding: 40px;
 }
 

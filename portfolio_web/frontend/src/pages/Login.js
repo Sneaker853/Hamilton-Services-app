@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import logo from '../assets/hamilton-services-logo-notext.png';
+import { useLanguage } from '../components';
 import './Login.css';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
@@ -43,6 +44,7 @@ const resolveApiBase = (apiBase) => {
 };
 
 const Login = ({ apiBase, fullScreen = false }) => {
+  const { tt } = useLanguage();
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,16 +66,16 @@ const Login = ({ apiBase, fullScreen = false }) => {
         try {
           const baseUrl = resolveApiBase(apiBase);
           await axios.post(`${baseUrl}/auth/verify-email/confirm`, { token: verifyToken }, { withCredentials: true, timeout: REQUEST_TIMEOUT });
-          setInfoMessage('Email verified successfully. You can now sign in.');
+          setInfoMessage(tt('Email verified successfully. You can now sign in.'));
         } catch (err) {
-          setError(err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail || 'Email verification failed.');
+          setError(err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail || tt('Email verification failed.'));
         }
       }
 
       if (resetTokenFromQuery) {
         setResetToken(resetTokenFromQuery);
         setMode('reset');
-        setInfoMessage('Enter your new password to complete reset.');
+        setInfoMessage(tt('Enter your new password to complete reset.'));
       }
     };
 
@@ -94,29 +96,29 @@ const Login = ({ apiBase, fullScreen = false }) => {
 
     if (mode === 'forgot') {
       if (!email) {
-        setError('Email is required.');
+        setError(tt('Email is required.'));
         return;
       }
     } else if (mode === 'reset') {
       if (!password) {
-        setError('New password is required.');
+        setError(tt('New password is required.'));
         return;
       }
       if (password !== confirmPassword) {
-        setError('Passwords do not match.');
+        setError(tt('Passwords do not match.'));
         return;
       }
       if (!resetToken) {
-        setError('Reset token is missing. Please use the link from your email.');
+        setError(tt('Reset token is missing. Please use the link from your email.'));
         return;
       }
     } else if (!email || !password) {
-      setError('Email and password are required.');
+      setError(tt('Email and password are required.'));
       return;
     }
 
     if (mode === 'signup' && password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(tt('Passwords do not match.'));
       return;
     }
 
@@ -126,7 +128,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
       if (mode === 'forgot') {
         const response = await axios.post(`${baseUrl}/auth/password-reset/request`, { email }, { timeout: REQUEST_TIMEOUT, withCredentials: true });
         const debugLink = response?.data?.debug_link;
-        setInfoMessage(response?.data?.message || 'If your account exists, a password reset link has been sent.');
+        setInfoMessage(response?.data?.message || tt('If your account exists, a password reset link has been sent.'));
         if (debugLink) {
           setInfoLink(debugLink);
         }
@@ -136,7 +138,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
           { token: resetToken, new_password: password },
           { timeout: REQUEST_TIMEOUT, withCredentials: true }
         );
-        setInfoMessage('Password reset successful. You can now sign in.');
+        setInfoMessage(tt('Password reset successful. You can now sign in.'));
         setMode('login');
         setPassword('');
         setConfirmPassword('');
@@ -151,14 +153,14 @@ const Login = ({ apiBase, fullScreen = false }) => {
         localStorage.setItem('authUser', JSON.stringify(user));
         localStorage.removeItem('guestMode');
         if (mode === 'signup') {
-          setInfoMessage('Account created. Please verify your email if required by your environment.');
+          setInfoMessage(tt('Account created. Please verify your email if required by your environment.'));
         }
         window.location.href = '/';
       }
     } catch (err) {
       console.error('Auth error:', err);
       
-      let errorMessage = 'Authentication failed.';
+      let errorMessage = tt('Authentication failed.');
       const apiMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
       
       if (err.code === 'ECONNABORTED') {
@@ -197,9 +199,9 @@ const Login = ({ apiBase, fullScreen = false }) => {
             <div className="auth-visual-inner">
               <img src={logo} alt="Hamilton Services" className="auth-logo" />
               <h2 className="auth-brand-title">Hamilton Services</h2>
-              <p className="auth-tagline">
-                Build, optimize, and track portfolios with a pro-grade investing stack.
-              </p>
+                    <p className="auth-tagline">
+                      {tt('Build, optimize, and track portfolios with a pro-grade investing stack.')}
+                    </p>
             </div>
           </div>
         )}
@@ -208,7 +210,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
           {!fullScreen && (
             <div className="page-header">
               <h1>Account</h1>
-              <p className="page-subtitle">Sign in or create an account to save portfolios.</p>
+              <p className="page-subtitle">{tt('Sign in or create an account to save portfolios.')}</p>
             </div>
           )}
 
@@ -218,20 +220,20 @@ const Login = ({ apiBase, fullScreen = false }) => {
               onClick={() => setMode('login')}
               type="button"
             >
-              Login
+              {tt('Login')}
             </button>
             <button
               className={`auth-tab ${mode === 'signup' ? 'active' : ''}`}
               onClick={() => setMode('signup')}
               type="button"
             >
-              Create Account
+              {tt('Create Account')}
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="form-group">
-              <label htmlFor="login-email">Email</label>
+              <label htmlFor="login-email">{tt('Email')}</label>
               <input
                 id="login-email"
                 ref={emailInputRef}
@@ -247,7 +249,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
 
             {mode !== 'forgot' && (
               <div className="form-group">
-                <label htmlFor="login-password">{mode === 'reset' ? 'New Password' : 'Password'}</label>
+                <label htmlFor="login-password">{mode === 'reset' ? tt('New Password') : tt('Password')}</label>
                 <input
                   id="login-password"
                   type="password"
@@ -294,7 +296,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
                         padding: 0,
                       }}
                     >
-                      Forgot password?
+                      {tt('Forgot password?')}
                     </button>
                   </div>
                 )}
@@ -303,7 +305,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
 
             {(mode === 'signup' || mode === 'reset') && (
               <div className="form-group">
-                <label>Confirm Password</label>
+                <label>{tt('Confirm Password')}</label>
                 <input
                   type="password"
                   className="form-control"
@@ -320,7 +322,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
                 {infoLink && (
                   <div style={{ marginTop: '8px' }}>
                     <a href={infoLink} style={{ color: 'var(--primary-teal)' }}>
-                      Open reset link
+                      {tt('Open reset link')}
                     </a>
                   </div>
                 )}
@@ -329,7 +331,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
             {error && <div className="error-message" id="login-error" role="alert">{error}</div>}
 
             <button className="btn-primary" type="submit" disabled={loading}>
-              {loading ? 'Please wait...' : mode === 'signup' ? 'Create Account' : mode === 'forgot' ? 'Send Reset Link' : mode === 'reset' ? 'Set New Password' : 'Sign In'}
+              {loading ? tt('Please wait...') : mode === 'signup' ? tt('Create Account') : mode === 'forgot' ? tt('Send Reset Link') : mode === 'reset' ? tt('Set New Password') : tt('Sign In')}
             </button>
             {fullScreen && (
               <button
@@ -340,7 +342,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
                   window.location.href = '/';
                 }}
               >
-                Continue without logging in
+                {tt('Continue without logging in')}
               </button>
             )}
           </form>

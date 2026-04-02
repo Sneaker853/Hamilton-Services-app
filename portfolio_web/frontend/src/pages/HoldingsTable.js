@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiX } from 'react-icons/fi';
+import { useLanguage } from '../components';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -56,14 +57,15 @@ const formatEstimatorLabel = (estimator) => {
 };
 
 const ConfidenceBadge = ({ holding }) => {
+  const { tt } = useLanguage();
   const score = estimateConfidenceScore(holding);
   const estimatorLabel = formatEstimatorLabel(holding?.return_estimator);
-  if (score == null) return <span className="pb-confidence-badge none" title={`No confidence data\nEstimator: ${estimatorLabel}`}>—</span>;
+  if (score == null) return <span className="pb-confidence-badge none" title={`${tt('No confidence data')}\n${tt('Estimator')}: ${estimatorLabel}`}>—</span>;
   const pct = Math.round(score * 100);
   let level = 'low';
   if (pct >= 70) level = 'high';
   else if (pct >= 40) level = 'med';
-  const confidenceHelp = `Confidence: ${pct}%\nEstimator: ${estimatorLabel}\nEstimated reliability of this holding's return/risk inputs.\nHigher confidence means stronger model signal and more stable risk profile.`;
+  const confidenceHelp = `${tt('Confidence')}: ${pct}%\n${tt('Estimator')}: ${estimatorLabel}\n${tt("Estimated reliability of this holding's return/risk inputs.")}\n${tt('Higher confidence means stronger model signal and more stable risk profile.')}`;
   return (
     <div className="pb-confidence-cell">
       <span className={`pb-confidence-badge ${level}`} title={confidenceHelp}>
@@ -73,21 +75,23 @@ const ConfidenceBadge = ({ holding }) => {
   );
 };
 
-const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop, onDragEnd, onMoveUp, onMoveDown }) => (
+const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop, onDragEnd, onMoveUp, onMoveDown }) => {
+  const { tt } = useLanguage();
+  return (
   <div className="holdings-table-wrapper">
-    <h3 className="pb-sub-title">Holdings ({holdings.length})</h3>
+    <h3 className="pb-sub-title">{tt('Holdings')} ({holdings.length})</h3>
     <div className="holdings-table pb-table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Ticker</th>
-            <th>Sector</th>
-            <th>Weight (%)</th>
-            <th>Confidence</th>
-            <th>Value</th>
-            <th>Shares</th>
-            <th className="pb-center-cell">Reorder</th>
-            <th className="pb-center-cell">Action</th>
+            <th>{tt('Ticker')}</th>
+            <th>{tt('Sector')}</th>
+            <th>{tt('Weight (%)')}</th>
+            <th>{tt('Confidence')}</th>
+            <th>{tt('Value')}</th>
+            <th>{tt('Shares')}</th>
+            <th className="pb-center-cell">{tt('Reorder')}</th>
+            <th className="pb-center-cell">{tt('Action')}</th>
           </tr>
         </thead>
         <tbody>
@@ -97,7 +101,7 @@ const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop
             <tr
               key={idx}
               draggable={!isTouchDevice}
-              aria-label={`Holding row ${holding.ticker}`}
+              aria-label={`${tt('Holding row')} ${holding.ticker}`}
               onDragStart={isTouchDevice ? undefined : () => onDragStart(holding.ticker)}
               onDragOver={isTouchDevice ? undefined : (event) => event.preventDefault()}
               onDrop={isTouchDevice ? undefined : () => onDrop(holding.ticker)}
@@ -107,7 +111,7 @@ const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop
               <td className="ticker">{holding.ticker}</td>
               <td className="pb-sector-cell">{holding.sector || 'N/A'}</td>
               <td>
-                <input
+              <td className="pb-sector-cell">{holding.sector || tt('N/A')}</td>
                   type="number"
                   value={holding.weight}
                   onChange={(e) => onWeightChange(holding.ticker, e.target.value)}
@@ -126,7 +130,7 @@ const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop
                     type="button"
                     onClick={() => onMoveUp(holding.ticker)}
                     className="pb-reorder-btn"
-                    aria-label={`Move ${holding.ticker} up`}
+                    aria-label={`${tt('Move')} ${holding.ticker} ${tt('up')}`}
                     disabled={idx === 0}
                   >
                     ↑
@@ -135,7 +139,7 @@ const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop
                     type="button"
                     onClick={() => onMoveDown(holding.ticker)}
                     className="pb-reorder-btn"
-                    aria-label={`Move ${holding.ticker} down`}
+                    aria-label={`${tt('Move')} ${holding.ticker} ${tt('down')}`}
                     disabled={idx === holdings.length - 1}
                   >
                     ↓
@@ -145,7 +149,7 @@ const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop
               <td className="pb-center-cell">
                 <button
                   onClick={() => onRemove(holding.ticker)}
-                  aria-label={`Remove ${holding.ticker}`}
+                  aria-label={`${tt('Remove')} ${holding.ticker}`}
                   className="pb-remove-btn"
                 >
                   <FiX />
@@ -158,6 +162,7 @@ const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop
       </table>
     </div>
   </div>
-);
+  );
+};
 
 export default HoldingsTable;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiTrendingUp, FiShield, FiActivity, FiBarChart2, FiGrid, FiBriefcase } from 'react-icons/fi';
+import { useLanguage } from '../components';
 import './Landing.css';
 
 const FEATURES = [
@@ -36,24 +37,25 @@ const FEATURES = [
 ];
 
 const Landing = ({ onContinueAsGuest, onLogin }) => {
+  const { tt } = useLanguage();
   return (
     <div className="landing-root">
       <div className="landing-hero">
         <p className="landing-overline">Hamilton Services</p>
         <h1 className="landing-title">
-          Institutional-Grade<br />
-          <span className="landing-highlight">Portfolio Analytics</span>
+          {tt('Institutional-Grade')}<br />
+          <span className="landing-highlight">{tt('Portfolio Analytics')}</span>
         </h1>
         <p className="landing-subtitle">
-          Build, optimize, and analyze diversified investment portfolios
-          with professional quantitative tools — free for individual investors.
+          {tt('Build, optimize, and analyze diversified investment portfolios')} 
+          {tt('with professional quantitative tools — free for individual investors.')}
         </p>
         <div className="landing-cta-row">
           <button className="landing-btn primary" onClick={onContinueAsGuest}>
-            Explore as Guest
+            {tt('Explore as Guest')}
           </button>
           <button className="landing-btn secondary" onClick={onLogin}>
-            Sign In
+            {tt('Sign In')}
           </button>
         </div>
       </div>
@@ -74,7 +76,7 @@ const Landing = ({ onContinueAsGuest, onLogin }) => {
       </div>
 
       <footer className="landing-footer">
-        <p>Built with React, FastAPI, PostgreSQL &amp; modern quantitative methods.</p>
+        <p>{tt('Built with React, FastAPI, PostgreSQL & modern quantitative methods.')}</p>
       </footer>
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './PortfolioBuilder.css';
+import { useLanguage } from '../components';
 
 // Extracted sub-components and utilities
 import {
@@ -20,45 +21,45 @@ import { HelpIcon } from '../components';
 import ProgressBar from '../components/ProgressBar';
 import { downloadCsv } from '../utils/exportCsv';
 
-const PortfolioSummary = ({ holdingsCount, investmentAmount, totalWeight }) => (
+const PortfolioSummary = ({ holdingsCount, investmentAmount, totalWeight, tt }) => (
   <div className="portfolio-summary pb-summary-wrap">
     <div className="summary-item">
-      <span>Holdings:</span>
+      <span>{tt('Holdings:')}</span>
       <strong>{holdingsCount}</strong>
     </div>
     <div className="summary-item">
-      <span>Investment:</span>
+      <span>{tt('Investment:')}</span>
       <strong>${investmentAmount.toLocaleString()}</strong>
     </div>
     <div className="summary-item">
-      <span>Allocated:</span>
+      <span>{tt('Allocated:')}</span>
       <strong className={Math.abs(totalWeight - 100) > 0.1 ? 'negative' : 'positive'}>
         {totalWeight.toFixed(1)}%
       </strong>
       {Math.abs(totalWeight - 100) > 0.1 && (
         <span className="pb-warning-inline">
-          Not 100%
+          {tt('Not 100%')}
         </span>
       )}
     </div>
   </div>
 );
 
-const MetricsPanel = ({ metrics, isBackend }) => (
+const MetricsPanel = ({ metrics, isBackend, tt }) => (
   <div className="portfolio-metrics pb-metrics-wrap">
-    <h3 className="pb-sub-title">Portfolio Metrics</h3>
+    <h3 className="pb-sub-title">{tt('Portfolio Metrics')}</h3>
     <div className="metrics-grid">
       <div className="metric-item">
-        <span className="metric-label">Expected Return <HelpIcon text="Annualized return estimate based on a Fama-French 5-factor model with cross-validated ridge regression. Reflects forward-looking factor exposures, not past performance." /></span>
+        <span className="metric-label">{tt('Expected Return')} <HelpIcon text="Annualized return estimate based on a Fama-French 5-factor model with cross-validated ridge regression. Reflects forward-looking factor exposures, not past performance." /></span>
         <span className="metric-value">{metrics.expected_return.toFixed(2)}%</span>
-        <span className="metric-source-label">{isBackend ? 'FF5 factor model' : 'Estimated (local)'}</span>
+        <span className="metric-source-label">{isBackend ? tt('FF5 factor model') : tt('Estimated (local)')}</span>
       </div>
       <div className="metric-item">
-        <span className="metric-label">Volatility <HelpIcon text="Annualized standard deviation of portfolio returns, estimated from a 600+ day covariance matrix with Ledoit-Wolf shrinkage. Higher values indicate greater price fluctuation risk." /></span>
+        <span className="metric-label">{tt('Volatility')} <HelpIcon text="Annualized standard deviation of portfolio returns, estimated from a 600+ day covariance matrix with Ledoit-Wolf shrinkage. Higher values indicate greater price fluctuation risk." /></span>
         <span className="metric-value">{metrics.volatility.toFixed(2)}%</span>
       </div>
       <div className="metric-item">
-        <span className="metric-label">Sharpe Ratio <HelpIcon text="Risk-adjusted return: (Expected Return − Risk-Free Rate) ÷ Volatility. Values above 1.0 are generally considered good; above 2.0 is excellent. Uses 2% as the risk-free rate." /></span>
+        <span className="metric-label">{tt('Sharpe Ratio')} <HelpIcon text="Risk-adjusted return: (Expected Return − Risk-Free Rate) ÷ Volatility. Values above 1.0 are generally considered good; above 2.0 is excellent. Uses 2% as the risk-free rate." /></span>
         <span className="metric-value">{metrics.sharpe_ratio.toFixed(2)}</span>
       </div>
     </div>
@@ -66,6 +67,7 @@ const MetricsPanel = ({ metrics, isBackend }) => (
 );
 
 const PortfolioBuilder = ({ apiBase }) => {
+  const { tt } = useLanguage();
   const [allSecurities, setAllSecurities] = useState([]);
   const [portfolio, setPortfolio] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -989,12 +991,12 @@ const PortfolioBuilder = ({ apiBase }) => {
   const handleSavePortfolio = async () => {
     const authUser = localStorage.getItem('authUser');
     if (!authUser) {
-      setSaveMessage('Please sign in to save your portfolio.');
+      setSaveMessage(tt('Please sign in to save your portfolio.'));
       return;
     }
 
     if (holdings.length === 0) {
-      setSaveMessage('Add holdings before saving.');
+      setSaveMessage(tt('Add holdings before saving.'));
       return;
     }
 
@@ -1019,10 +1021,10 @@ const PortfolioBuilder = ({ apiBase }) => {
     setSaveMessage(null);
     try {
       await axios.post(`${apiBase}/portfolios/save`, payload, { withCredentials: true });
-      setSaveMessage('Portfolio saved.');
+      setSaveMessage(tt('Portfolio saved.'));
     } catch (err) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
-      setSaveMessage(apiMessage || 'Failed to save portfolio.');
+      setSaveMessage(apiMessage || tt('Failed to save portfolio.'));
     } finally {
       setSaving(false);
     }
@@ -1106,9 +1108,9 @@ const PortfolioBuilder = ({ apiBase }) => {
   return (
     <div className="page-container portfolio-builder-root">
       <div className="page-header">
-        <h1 className="pb-page-title">Portfolio Builder</h1>
+        <h1 className="pb-page-title">{tt('Portfolio Builder')}</h1>
         <p className="page-subtitle pb-page-subtitle">
-          Customize your portfolio by selecting stocks and setting weights
+          {tt('Customize your portfolio by selecting stocks and setting weights')}
         </p>
       </div>
 
@@ -1118,11 +1120,11 @@ const PortfolioBuilder = ({ apiBase }) => {
           <div className="form-section pb-form-section">
             <div className="pb-step-head">
               <span className="pb-step-index">1</span>
-              <h2 className="pb-section-title">Set Portfolio Preferences</h2>
+              <h2 className="pb-section-title">{tt('Set Portfolio Preferences')}</h2>
             </div>
 
             <div className="form-group pb-compact-group">
-              <label>Investment Amount ($)</label>
+              <label>{tt('Investment Amount ($)')}</label>
               <input
                 type="number"
                 value={investmentAmount}
@@ -1137,8 +1139,8 @@ const PortfolioBuilder = ({ apiBase }) => {
               <label
                 className="pb-label-row pb-check-row"
                 title={autoOptimize
-                  ? 'Weights automatically optimize for best return/volatility ratio when you add or remove stocks'
-                  : 'Manual mode — set your own weights freely'}
+                  ? tt('Weights automatically optimize for best return/volatility ratio when you add or remove stocks')
+                  : tt('Manual mode — set your own weights freely')}
               >
                 <input
                   type="checkbox"
@@ -1146,7 +1148,7 @@ const PortfolioBuilder = ({ apiBase }) => {
                   onChange={(e) => setAutoOptimize(e.target.checked)}
                   className="pb-check-input"
                 />
-                                <span className="pb-check-title">Auto-Optimize Weights</span>
+                                <span className="pb-check-title">{tt('Auto-Optimize Weights')}</span>
                 <HelpIcon text="When enabled, portfolio weights are automatically optimized for the best Sharpe ratio (return per unit of risk) whenever you add or remove holdings." />
               </label>
             </div>
@@ -1155,7 +1157,7 @@ const PortfolioBuilder = ({ apiBase }) => {
               <div className="pb-constraints-panel">
                 <div className="pb-constraints-row">
                   <div className="pb-constraint-field">
-                    <label className="pb-constraint-label">Min Position (%) <HelpIcon text="Positions with weight below this threshold are automatically zeroed out during optimization, preventing negligible allocations that add complexity without meaningful impact." /></label>
+                    <label className="pb-constraint-label">{tt('Min Position (%)')} <HelpIcon text="Positions with weight below this threshold are automatically zeroed out during optimization, preventing negligible allocations that add complexity without meaningful impact." /></label>
                     <input
                       type="number"
                       value={minActiveWeight}
@@ -1175,7 +1177,7 @@ const PortfolioBuilder = ({ apiBase }) => {
                         onChange={(e) => setMaxTurnover(e.target.checked ? 50 : null)}
                         className="pb-check-input"
                       />
-                      Max Turnover (%)
+                      {tt('Max Turnover (%)')}
                     </label>
                     <input
                       type="number"
@@ -1192,7 +1194,7 @@ const PortfolioBuilder = ({ apiBase }) => {
                 </div>
                 {constraintsApplied.length > 0 && (
                   <small className="pb-constraints-applied">
-                    Applied: {constraintsApplied.join(', ')}
+                    {tt('Applied:')} {constraintsApplied.join(', ')}
                   </small>
                 )}
               </div>
@@ -1200,7 +1202,7 @@ const PortfolioBuilder = ({ apiBase }) => {
 
             {optimizing && (
               <div className="pb-optimizing-banner">
-                <ProgressBar active={optimizing} estimatedMs={4000} label="Optimizing weights..." />
+                <ProgressBar active={optimizing} estimatedMs={4000} label={tt('Optimizing weights...')} />
               </div>
             )}
 
@@ -1231,25 +1233,25 @@ const PortfolioBuilder = ({ apiBase }) => {
             <div className="results-section">
               <div className={`pb-health-bar ${allocationGap > 0.1 ? 'warning' : 'healthy'}`}>
                 <div className="pb-health-items">
-                  <span><strong>{holdings.length}</strong> holdings</span>
-                  <span><strong>${investmentAmount.toLocaleString()}</strong> investment</span>
+                  <span><strong>{holdings.length}</strong> {tt('holdings')}</span>
+                  <span><strong>${investmentAmount.toLocaleString()}</strong> {tt('investment')}</span>
                   <span>
-                    Allocation <strong>{totalWeight.toFixed(1)}%</strong>
+                    {tt('Allocation')} <strong>{totalWeight.toFixed(1)}%</strong>
                   </span>
                 </div>
                 {allocationGap > 0.1 ? (
                   <button onClick={normalizeWeights} className="pb-health-fix-btn">
-                    Normalize to 100%
+                    {tt('Normalize to 100%')}
                   </button>
                 ) : (
-                  <span className="pb-health-ok">Balanced</span>
+                  <span className="pb-health-ok">{tt('Balanced')}</span>
                 )}
               </div>
 
               <div className="pb-results-head">
                 <div className="pb-step-head pb-inline-head">
                   <span className="pb-step-index">3</span>
-                  <h2 className="pb-section-title">Review & Save</h2>
+                  <h2 className="pb-section-title">{tt('Review & Save')}</h2>
                   <span className={`pb-model-badge ${isBackendFrontierActive ? 'backend' : 'fallback'}`}>
                     {frontierModelLabel}
                   </span>
@@ -1259,7 +1261,7 @@ const PortfolioBuilder = ({ apiBase }) => {
                     type="text"
                     value={saveName}
                     onChange={(e) => setSaveName(e.target.value)}
-                    placeholder="Portfolio name"
+                    placeholder={tt('Portfolio name')}
                     className="form-control pb-name-input"
                   />
                   <button
@@ -1267,22 +1269,22 @@ const PortfolioBuilder = ({ apiBase }) => {
                     disabled={saving}
                     className="pb-action-btn pb-save-btn"
                   >
-                    {saving ? 'Saving...' : 'Save'}
+                    {saving ? tt('Saving...') : tt('Save')}
                   </button>
                   <button
                     onClick={reoptimizePortfolio}
                     disabled={optimizing || !autoOptimize}
                     className={`pb-action-btn secondary ${(optimizing || !autoOptimize) ? 'disabled' : ''}`}
-                    title={!autoOptimize ? 'Enable Auto-Optimize to use this' : 'Re-run weight optimization'}
+                    title={!autoOptimize ? tt('Enable Auto-Optimize to use this') : tt('Re-run weight optimization')}
                   >
-                    {optimizing ? 'Optimizing...' : 'Re-Optimize'}
+                    {optimizing ? tt('Optimizing...') : tt('Re-Optimize')}
                   </button>
                   <button
                     onClick={handleExportCsv}
                     className="pb-action-btn secondary"
-                    title="Download holdings as CSV"
+                    title={tt('Download holdings as CSV')}
                   >
-                    Export CSV
+                    {tt('Export CSV')}
                   </button>
                 </div>
               </div>
@@ -1295,9 +1297,10 @@ const PortfolioBuilder = ({ apiBase }) => {
                 holdingsCount={holdings.length}
                 investmentAmount={investmentAmount}
                 totalWeight={totalWeight}
+                tt={tt}
               />
 
-              <MetricsPanel metrics={metrics} isBackend={backendMetrics && backendMetrics.signature === activeHoldingsSignature} />
+              <MetricsPanel metrics={metrics} isBackend={backendMetrics && backendMetrics.signature === activeHoldingsSignature} tt={tt} />
 
               <ChartsPanel
                 sectorData={getSectorDistribution()}

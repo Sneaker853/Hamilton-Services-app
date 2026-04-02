@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { FiMail, FiMapPin, FiSend } from 'react-icons/fi';
+import { useLanguage } from '../components';
 import './Contact.css';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
@@ -14,6 +15,7 @@ const API_BASE = (() => {
 })();
 
 const Contact = () => {
+  const { tt } = useLanguage();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
@@ -35,7 +37,7 @@ const Contact = () => {
       }, { timeout: 15000 });
       setSubmitted(true);
     } catch (err) {
-      const msg = err?.response?.data?.detail || err?.response?.data?.message || 'Unable to send your message. Please try again or email us directly.';
+      const msg = err?.response?.data?.detail || err?.response?.data?.message || tt('Unable to send your message. Please try again or email us directly.');
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -46,38 +48,38 @@ const Contact = () => {
     <div className="contact-root">
       <section className="contact-glass contact-hero">
         <div className="contact-hero-icon"><FiMail /></div>
-        <h1>Contact Us</h1>
-        <p>Have a question, feedback, or need support? We'd love to hear from you.</p>
+        <h1>{tt('Contact Us')}</h1>
+        <p>{tt("Have a question, feedback, or need support? We'd love to hear from you.")}</p>
       </section>
 
       <div className="contact-layout">
         <section className="contact-glass contact-info-card">
-          <h3>Get in Touch</h3>
+          <h3>{tt('Get in Touch')}</h3>
           <div className="contact-info-item">
             <FiMail className="contact-info-icon" />
             <div>
-              <p className="contact-info-label">Email</p>
+              <p className="contact-info-label">{tt('Email')}</p>
               <a href={`mailto:${CONTACT_EMAIL}`} className="contact-info-value">{CONTACT_EMAIL}</a>
             </div>
           </div>
           <div className="contact-info-item">
             <FiMapPin className="contact-info-icon" />
             <div>
-              <p className="contact-info-label">Location</p>
+              <p className="contact-info-label">{tt('Location')}</p>
               <span className="contact-info-value">Montreal, Canada</span>
             </div>
           </div>
           <div className="contact-response-note">
-            <p>We typically respond within 1–2 business days.</p>
+            <p>{tt('We typically respond within 1-2 business days.')}</p>
           </div>
         </section>
 
         <section className="contact-glass contact-form-card">
-          <h3>Send a Message</h3>
+          <h3>{tt('Send a Message')}</h3>
           {submitted ? (
             <div className="contact-success">
               <FiSend className="contact-success-icon" />
-              <p>Thank you! Your message has been sent. We typically respond within 1–2 business days.</p>
+              <p>{tt('Thank you! Your message has been sent. We typically respond within 1-2 business days.')}</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="contact-form">

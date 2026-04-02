@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { ResponsiveContainer, Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 import { FiBarChart2, FiSearch, FiTrendingDown, FiTrendingUp } from 'react-icons/fi';
-import { HelpIcon } from '../components';
+import { HelpIcon, useLanguage } from '../components';
 import './MarketData.css';
 
 const periods = ['1W', '1M', '3M', '6M', '1Y', '5Y', 'MAX'];
 
 const MarketData = ({ apiBase }) => {
+  const { tt } = useLanguage();
   const [stocks, setStocks] = useState([]);
   const [selectedStock, setSelectedStock] = useState(null);
   const [stockDetails, setStockDetails] = useState(null);
@@ -36,7 +37,7 @@ const MarketData = ({ apiBase }) => {
       setTickersWithPrice(response.data.tickers_with_price || 0);
     } catch (fetchError) {
       console.error('Error fetching stocks:', fetchError);
-      setError('Unable to load market data. Please try again.');
+      setError(tt('Unable to load market data. Please try again.'));
     }
   }, [apiBase]);
 
@@ -58,7 +59,7 @@ const MarketData = ({ apiBase }) => {
       setStockDetails(response.data);
     } catch (fetchError) {
       console.error('Error fetching stock details:', fetchError);
-      setError('Unable to load security details. Please try again.');
+      setError(tt('Unable to load security details. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -71,7 +72,7 @@ const MarketData = ({ apiBase }) => {
       setPriceHistory(response.data.data || []);
     } catch (fetchError) {
       console.error('Error fetching price history:', fetchError);
-      setError('Unable to load price history. Please try again.');
+      setError(tt('Unable to load price history. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -207,8 +208,8 @@ const MarketData = ({ apiBase }) => {
         <div className="market-head-left">
           <div className="market-icon-wrap"><FiBarChart2 /></div>
           <div>
-            <h2>Market Data</h2>
-            <p>Explore stocks, fundamentals, and historical price action.</p>
+            <h2>{tt('Market Data')}</h2>
+            <p>{tt('Explore stocks, fundamentals, and historical price action.')}</p>
             {latestPriceDateLabel && (
               <p>
                 Price data as of {latestPriceDateLabel}
@@ -225,7 +226,7 @@ const MarketData = ({ apiBase }) => {
             <FiSearch />
             <input
               type="text"
-              placeholder="Search ticker or name..."
+              placeholder={tt('Search ticker or name...')}
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
@@ -259,25 +260,24 @@ const MarketData = ({ apiBase }) => {
                 ))}
               </div>
             )}
-            />
           </div>
 
           <div className="market-filters">
             <select value={selectedSector} onChange={(event) => setSelectedSector(event.target.value)}>
-              <option value="">All Sectors</option>
+              <option value="">{tt('All Sectors')}</option>
               {sectors.map((sector) => (
                 <option key={sector} value={sector}>{sector}</option>
               ))}
             </select>
             <select value={selectedExchange} onChange={(event) => setSelectedExchange(event.target.value)}>
-              <option value="">All Exchanges</option>
+              <option value="">{tt('All Exchanges')}</option>
               {exchanges.map((exchange) => (
                 <option key={exchange} value={exchange}>{exchange}</option>
               ))}
             </select>
           </div>
 
-          <p className="market-stock-count">Showing {filteredStocks.length} of {stocks.length} stocks</p>
+          <p className="market-stock-count">{tt('Showing')} {filteredStocks.length} {tt('of')} {stocks.length} {tt('stocks')}</p>
 
           <div className="market-stock-list">
             {filteredStocks.map((stock) => (
@@ -300,8 +300,8 @@ const MarketData = ({ apiBase }) => {
         <section className="market-main-panel">
           {!selectedStock && (
             <div className="market-glass market-empty-state">
-              <h3>Select a stock to view details</h3>
-              <p>Choose from {stocks.length} stocks in your database.</p>
+              <h3>{tt('Select a stock to view details')}</h3>
+              <p>{tt('Choose from')} {stocks.length} {tt('stocks in your database.')}</p>
             </div>
           )}
 
@@ -330,6 +330,8 @@ const MarketData = ({ apiBase }) => {
                   <div><p>ROE <HelpIcon text="Return on Equity. Measures how effectively a company uses shareholder money to generate profit. Higher ROE generally indicates better management efficiency." /></p><strong>{formatPercent(stockDetails.roe)}</strong></div>
                   <div><p>Dividend Yield <HelpIcon text="Annual dividend payment as a percentage of the stock price. Shows how much income you earn per dollar invested, before any price changes." /></p><strong>{formatPercent(stockDetails.dividend_yield)}</strong></div>
                   <div><p>Debt/Equity <HelpIcon text="Ratio of total debt to shareholder equity. Shows how much a company relies on borrowed money. Lower is generally safer; high ratios may signal financial risk." /></p><strong>{stockDetails.debt_to_equity ? stockDetails.debt_to_equity.toFixed(2) : 'N/A'}</strong></div>
+                  <div><p>Expected Return <HelpIcon text="Annualized expected return estimated by the Fama-French 5-factor model. Reflects the stock's factor exposures, not a guarantee of future performance." /></p><strong className={stockDetails.expected_return >= 0 ? 'positive' : 'negative'}>{stockDetails.expected_return != null ? `${(stockDetails.expected_return * 100).toFixed(2)}%` : 'N/A'}</strong></div>
+                  <div><p>Volatility <HelpIcon text="Annualized standard deviation of the stock's daily returns. Higher values indicate larger price swings and greater uncertainty." /></p><strong>{stockDetails.volatility != null ? `${(stockDetails.volatility * 100).toFixed(2)}%` : 'N/A'}</strong></div>
                 </div>
               </article>
 
@@ -364,17 +366,24 @@ const MarketData = ({ apiBase }) => {
                           dataKey="date"
                           tick={{ fill: '#64748b', fontSize: 11 }}
                           tickFormatter={(date) => {
-                            const value = new Date(date);
-                            if (selectedPeriod === '1D') {
-                              return value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                            }
+                            const d = new Date(date);
+                            if (!d || isNaN(d)) return '';
                             if (selectedPeriod === '1W') {
-                              return value.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                              return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                             }
-                            return value.toLocaleDateString([], { month: 'short', year: '2-digit' });
+                            if (selectedPeriod === '1M') {
+                              return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            }
+                            if (selectedPeriod === '3M' || selectedPeriod === '6M') {
+                              return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            }
+                            // 1Y, 5Y, MAX: show "Jan '25" style
+                            return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
                           }}
                           axisLine={false}
                           tickLine={false}
+                          minTickGap={selectedPeriod === '1W' || selectedPeriod === '1M' ? 30 : 50}
+                          interval="preserveStartEnd"
                         />
                         <YAxis
                           tick={{ fill: '#64748b', fontSize: 11 }}

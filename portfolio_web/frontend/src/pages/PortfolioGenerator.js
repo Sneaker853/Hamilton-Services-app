@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { FiTrendingUp, FiDollarSign, FiLayers, FiPieChart, FiBarChart2, FiSettings, FiDownload } from 'react-icons/fi';
-import { Button, Card, CardHeader, CardBody, LoadingSkeleton, CardSkeleton, HelpIcon } from '../components';
+import { Button, Card, CardHeader, CardBody, LoadingSkeleton, CardSkeleton, HelpIcon, useLanguage } from '../components';
 import ProgressBar from '../components/ProgressBar';
 import { downloadCsv } from '../utils/exportCsv';
 import './PortfolioGenerator.css';
@@ -18,15 +18,28 @@ const PERSONA_DESCRIPTIONS = {
   aggressive: 'High risk tolerance. Maximizes growth potential, accepts significant drawdowns. Expected returns: 10–15% annually.',
 };
 
+// Max sector % defaults per persona (higher = more concentrated OK)
+const PERSONA_SECTOR_MAX = {
+  growth_seeker: 100,
+  aggressive: 80,
+  moderate_aggressive: 50,
+  eco_friendly: 40,
+  income_focus: 35,
+  balanced: 30,
+  moderate_conservative: 25,
+  conservative: 20,
+};
+
 const PortfolioGenerator = ({ apiBase }) => {
+  const { tt } = useLanguage();
   const [personas, setPersonas] = useState([]);
   const [formData, setFormData] = useState({
     persona_name: 'balanced',
     investment_amount: 100000,
     min_holdings: 10,
-    max_holdings: 20,
-    max_position_pct: 10,
-    max_sector_pct: 25,
+    max_holdings: 40,
+    max_position_pct: 25,
+    max_sector_pct: PERSONA_SECTOR_MAX['balanced'] ?? 30,
     include_bonds: false,
     include_etfs: false,
     rebalance_threshold: 5
@@ -136,7 +149,7 @@ const PortfolioGenerator = ({ apiBase }) => {
         setPersonas(response.data);
       } catch (error) {
         console.error('Error fetching personas:', error);
-        setError('Unable to load investment profiles. Please refresh the page.');
+        setError(tt('Unable to load investment profiles. Please refresh the page.'));
       } finally {
         setPersonasLoading(false);
       }
@@ -145,11 +158,20 @@ const PortfolioGenerator = ({ apiBase }) => {
     fetchPersonas();
   }, [apiBase]);
 
+  // Auto-update max_sector_pct when persona changes
+  useEffect(() => {
+    const sectorMax = PERSONA_SECTOR_MAX[formData.persona_name];
+    if (sectorMax !== undefined) {
+      setFormData(prev => ({ ...prev, max_sector_pct: sectorMax }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.persona_name]);
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : 
+      [name]: type === 'checkbox' ? checked :
               name === 'investment_amount' ? parseFloat(value) :
               name.includes('_') && name !== 'persona_name' ? parseInt(value) : value
     }));
@@ -165,7 +187,7 @@ const PortfolioGenerator = ({ apiBase }) => {
       setPortfolio(response.data);
     } catch (error) {
       console.error('Error generating portfolio:', error);
-      setError(error.response?.data?.message || error.response?.data?.error || error.response?.data?.detail || 'Unable to generate your portfolio. Please try again.');
+      setError(error.response?.data?.message || error.response?.data?.error || error.response?.data?.detail || tt('Unable to generate your portfolio. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -247,12 +269,12 @@ const PortfolioGenerator = ({ apiBase }) => {
   const handleSavePortfolio = async () => {
     const authUser = localStorage.getItem('authUser');
     if (!authUser) {
-      setSaveMessage('Please sign in to save your portfolio.');
+      setSaveMessage(tt('Please sign in to save your portfolio.'));
       return;
     }
 
     if (!portfolio) {
-      setSaveMessage('Generate a portfolio before saving.');
+      setSaveMessage(tt('Generate a portfolio before saving.'));
       return;
     }
 
@@ -269,10 +291,10 @@ const PortfolioGenerator = ({ apiBase }) => {
     setSaveMessage(null);
     try {
       await axios.post(`${apiBase}/portfolios/save`, payload, { withCredentials: true });
-      setSaveMessage('Portfolio saved.');
+      setSaveMessage(tt('Portfolio saved.'));
     } catch (err) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
-      setSaveMessage(apiMessage || 'Unable to save your portfolio. Please try again.');
+      setSaveMessage(apiMessage || tt('Unable to save your portfolio. Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -294,20 +316,20 @@ const PortfolioGenerator = ({ apiBase }) => {
   return (
     <div className="page-container portfolio-generator-root">
       <div className="page-header">
-        <h1 className="pg-page-title">Portfolio Generator</h1>
-        <p className="page-subtitle pg-page-subtitle">Build a diversified portfolio based on your risk profile and constraints</p>
+        <h1 className="pg-page-title">{tt('Portfolio Generator')}</h1>
+        <p className="page-subtitle pg-page-subtitle">{tt('Build a diversified portfolio based on your risk profile and constraints')}</p>
       </div>
 
       <div className={`pg-layout-grid ${portfolio ? 'with-results' : 'single-column'}`}>
         {/* Form Section */}
         <div>
           <form className="form-section" onSubmit={handleSubmit}>
-            <h2 className="pg-section-title">Portfolio Parameters</h2>
+            <h2 className="pg-section-title">{tt('Portfolio Parameters')}</h2>
 
             <div className="form-group">
               <label className="pg-label-row">
                 <FiSettings size={16} />
-                Portfolio Persona
+                {tt('Portfolio Persona')}
               </label>
               {personasLoading ? (
                 <LoadingSkeleton height="44px" borderRadius="8px" />
@@ -335,7 +357,7 @@ const PortfolioGenerator = ({ apiBase }) => {
             <div className="form-group">
               <label className="pg-label-row">
                 <FiDollarSign size={16} />
-                Investment Amount
+                {tt('Investment Amount')}
               </label>
               <input
                 type="number"
@@ -351,7 +373,7 @@ const PortfolioGenerator = ({ apiBase }) => {
 
             <div className="pg-two-col-grid">
               <div className="form-group">
-                <label>Min Holdings</label>
+                <label>{tt('Min Holdings')}</label>
                 <input
                   type="number"
                   name="min_holdings"
@@ -363,7 +385,7 @@ const PortfolioGenerator = ({ apiBase }) => {
                 />
               </div>
               <div className="form-group">
-                <label>Max Holdings</label>
+                <label>{tt('Max Holdings')}</label>
                 <input
                   type="number"
                   name="max_holdings"
@@ -414,7 +436,7 @@ const PortfolioGenerator = ({ apiBase }) => {
                   onChange={handleInputChange}
                   className="form-check-input pg-check-input"
                 />
-                <span>Include ETFs</span>
+                <span>{tt('Include ETFs')}</span>
               </label>
             </div>
 
@@ -427,14 +449,14 @@ const PortfolioGenerator = ({ apiBase }) => {
                   onChange={handleInputChange}
                   className="form-check-input pg-check-input"
                 />
-                <span>Include Bonds</span>
+                <span>{tt('Include Bonds')}</span>
               </label>
             </div>
 
             {error && (
               <div className="error-message pg-form-error">
                 {error}
-                <button type="button" className="pg-retry-btn" onClick={() => { setError(null); }}>Dismiss</button>
+                <button type="button" className="pg-retry-btn" onClick={() => { setError(null); }}>{tt('Dismiss')}</button>
               </div>
             )}
 
@@ -446,7 +468,7 @@ const PortfolioGenerator = ({ apiBase }) => {
               fullWidth
               icon={<FiTrendingUp />}
             >
-              Generate Portfolio
+              {tt('Generate Portfolio')}
             </Button>
           </form>
         </div>
@@ -458,11 +480,11 @@ const PortfolioGenerator = ({ apiBase }) => {
               <CardHeader>
                 <div className="pg-loading-head">
                   <FiPieChart size={20} className="pg-icon-cyan" />
-                  <h2 className="pg-card-title">Generating Portfolio...</h2>
+                  <h2 className="pg-card-title">{tt('Generating Portfolio...')}</h2>
                 </div>
               </CardHeader>
               <CardBody>
-                <ProgressBar active={loading} estimatedMs={6000} label="Generating portfolio..." />
+                <ProgressBar active={loading} estimatedMs={6000} label={tt('Generating portfolio...')} />
                 <div className="pg-loading-grid">
                   <CardSkeleton />
                   <LoadingSkeleton height="300px" borderRadius="12px" />
@@ -477,13 +499,13 @@ const PortfolioGenerator = ({ apiBase }) => {
           <div>
             <div className="results-section">
               <div className="pg-results-head">
-                <h2 className="pg-card-title">Portfolio Results</h2>
+                <h2 className="pg-card-title">{tt('Portfolio Results')}</h2>
                 <div className="pg-results-actions">
                   <input
                     type="text"
                     value={saveName}
                     onChange={(e) => setSaveName(e.target.value)}
-                    placeholder="Portfolio name"
+                    placeholder={tt('Portfolio name')}
                     className="form-control pg-name-input"
                   />
                   <Button
@@ -492,7 +514,7 @@ const PortfolioGenerator = ({ apiBase }) => {
                     onClick={handleExportCsv}
                     icon={<FiDownload />}
                   >
-                    Export CSV
+                    {tt('Export CSV')}
                   </Button>
                   <Button
                     variant="secondary"
@@ -518,7 +540,7 @@ const PortfolioGenerator = ({ apiBase }) => {
                     loading={saving}
                     onClick={handleSavePortfolio}
                   >
-                    Save
+                    {tt('Save')}
                   </Button>
                 </div>
               </div>
@@ -556,14 +578,14 @@ const PortfolioGenerator = ({ apiBase }) => {
                           </div>
                         </CardHeader>
                         <CardBody>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ResponsiveContainer width="100%" height={240}>
                         <PieChart>
                           <Pie
                             data={getAssetTypeDistribution()}
                             cx="50%"
-                            cy="45%"
+                            cy="50%"
                             innerRadius={60}
-                            outerRadius={100}
+                            outerRadius={90}
                             paddingAngle={3}
                             cornerRadius={4}
                             stroke="rgba(10, 14, 26, 0.6)"
@@ -577,9 +599,16 @@ const PortfolioGenerator = ({ apiBase }) => {
                             ))}
                           </Pie>
                           <Tooltip content={renderPieTooltip} cursor={{ fill: 'rgba(255, 255, 255, 0.04)' }} />
-                          <Legend wrapperStyle={pieLegendStyle} iconType="circle" iconSize={8} />
                         </PieChart>
                       </ResponsiveContainer>
+                      <div className="pg-pie-legend">
+                        {getAssetTypeDistribution().map((entry, index) => (
+                          <div key={index} className="pg-pie-legend-item">
+                            <span className="pg-pie-legend-dot" style={{ background: COLORS[index % COLORS.length] }} />
+                            <span className="pg-pie-legend-label">{entry.name}</span>
+                          </div>
+                        ))}
+                      </div>
                         </CardBody>
                       </Card>
                   )}
@@ -594,14 +623,14 @@ const PortfolioGenerator = ({ apiBase }) => {
                           </div>
                         </CardHeader>
                         <CardBody>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ResponsiveContainer width="100%" height={240}>
                         <PieChart>
                           <Pie
                             data={getSectorDistribution()}
                             cx="50%"
-                            cy="45%"
+                            cy="50%"
                             innerRadius={60}
-                            outerRadius={100}
+                            outerRadius={90}
                             paddingAngle={3}
                             cornerRadius={4}
                             stroke="rgba(10, 14, 26, 0.6)"
@@ -615,9 +644,16 @@ const PortfolioGenerator = ({ apiBase }) => {
                             ))}
                           </Pie>
                           <Tooltip content={renderPieTooltip} cursor={{ fill: 'rgba(255, 255, 255, 0.04)' }} />
-                          <Legend wrapperStyle={pieLegendStyle} iconType="circle" iconSize={8} />
                         </PieChart>
                       </ResponsiveContainer>
+                      <div className="pg-pie-legend">
+                        {getSectorDistribution().map((entry, index) => (
+                          <div key={index} className="pg-pie-legend-item">
+                            <span className="pg-pie-legend-dot" style={{ background: COLORS[index % COLORS.length] }} />
+                            <span className="pg-pie-legend-label">{entry.name}</span>
+                          </div>
+                        ))}
+                      </div>
                         </CardBody>
                       </Card>
                   )}

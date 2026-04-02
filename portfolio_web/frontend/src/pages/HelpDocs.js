@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FiChevronDown, FiChevronRight, FiBookOpen, FiHelpCircle, FiTool } from 'react-icons/fi';
+import { useLanguage } from '../components';
 import './HelpDocs.css';
 
 const FAQ_SECTIONS = [
@@ -80,7 +81,39 @@ const FAQ_SECTIONS = [
         a: 'Save two or more portfolios, then go to the Compare page. Select the portfolios you want to compare and view their metrics side-by-side, including expected return, volatility, Sharpe ratio, sector weights, and top holdings.',
       },
       {
-        q: 'What is the drift monitor\'s forecast feature?',
+        q: 'What does the "confidence score" mean for a stock?',
+        a: 'The confidence score (0–100) reflects how reliable the Fama-French factor estimates are for that stock. It is based on the number of months of return data available and the R² of the regression. Stocks with fewer than 24 months of data or low R² will have a lower confidence score.',
+      },
+      {
+        q: 'Why are some stocks missing expected return or risk metrics?',
+        a: 'These metrics require at least 12–24 months of price history to compute reliably. Newly-listed stocks, crypto assets, and commodities may show N/A for expected return, beta, or volatility because the factor model cannot be estimated with insufficient data.',
+      },
+      {
+        q: 'Does the platform use real-time prices?',
+        a: 'Price data is refreshed daily from Yahoo Finance. The platform does not show live intraday prices. For portfolio performance, valuations are based on the most recent closing price ingested into the database.',
+      },
+      {
+        q: 'Why does my total portfolio value look higher than my investment?',
+        a: 'The "Projected Portfolio Value" shown in the Dashboard adds your original investment to its expected 1-year gain based on the model\'s annual return estimate. This is a forward-looking projection, not your account balance or realized return.',
+      },
+      {
+        q: 'What is the ESG score and how is it calculated?',
+        a: 'The ESG score is sourced from Yahoo Finance\'s sustainability data. It reflects environmental, social, and governance factors. Lower scores generally indicate better ESG performance. Not all stocks have ESG data — the field shows N/A when unavailable.',
+      },
+      {
+        q: 'How do price alerts work?',
+        a: 'You can set trigger conditions (price above/below a threshold) on any stock in your database. Alerts are evaluated manually when you click "Check Now" on the Alerts page. Automated email notifications are not currently enabled.',
+      },
+      {
+        q: 'Why does the app sometimes take a long time to load?',
+        a: 'The backend runs on Render\'s free tier, which powers down after periods of inactivity. The first request after a cold start can take 20–60 seconds. Subsequent requests will be fast. This is a known infrastructure limitation that can be resolved by upgrading to a paid hosting tier.',
+      },
+      {
+        q: 'What does the "Optimizer Persona" do?',
+        a: 'Each persona pre-configures optimization constraints that match a risk profile. For example, "Conservative" limits sector concentration to 20% and prefers low-volatility assets, while "Growth Seeker" allows up to 100% in a single sector to maximize upside. You can override any constraint manually after selecting a persona.',
+      },
+      {
+        q: 'How does the drift monitor\'s forecast feature?',
         a: 'The predictive drift forecast uses the past 90 days of price trends to project where your portfolio weights will be 30 days from now. It provides a rebalance urgency level (low, medium, high) to help you plan ahead.',
       },
       {
@@ -111,12 +144,21 @@ const AccordionItem = ({ question, answer }) => {
 };
 
 const HelpDocs = () => {
+  const { lang, tt } = useLanguage();
+  const sectionTitle = (title) => {
+    if (lang !== 'fr') return title;
+    if (title === 'Getting Started') return 'Bien demarrer';
+    if (title === 'Financial Concepts') return 'Concepts financiers';
+    if (title === 'Platform Features') return 'Fonctionnalites de la plateforme';
+    return title;
+  };
+
   return (
     <div className="page-container help-docs-root">
       <div className="page-header">
-        <h1>Help &amp; FAQ</h1>
+        <h1>{tt('Help & FAQ')}</h1>
         <p className="page-subtitle">
-          Learn about the platform, financial concepts, and how to get the most out of your portfolio analytics.
+          {tt('Learn about the platform, financial concepts, and how to get the most out of your portfolio analytics.')}
         </p>
       </div>
 
@@ -126,7 +168,7 @@ const HelpDocs = () => {
           <div key={section.title} className="faq-section">
             <h2 className="faq-section-title">
               <Icon size={20} />
-              {section.title}
+              {sectionTitle(section.title)}
             </h2>
             <div className="faq-list">
               {section.items.map((item) => (
@@ -138,7 +180,7 @@ const HelpDocs = () => {
       })}
 
       <div className="faq-footer">
-        <p>Can't find what you're looking for? <a href="/contact">Contact us</a> and we'll help.</p>
+        <p>{tt("Can't find what you're looking for?")} <a href="/contact">{tt('Contact us')}</a> {tt("and we'll help.")}</p>
       </div>
     </div>
   );

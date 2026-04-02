@@ -27,6 +27,9 @@ export {
 // Tooltip
 export { Tooltip, HelpIcon } from './Tooltip';
 
+// Language
+export { LanguageProvider, useLanguage } from './LanguageContext';
+
 // Modal
 export { ConfirmModal } from './ConfirmModal';
 

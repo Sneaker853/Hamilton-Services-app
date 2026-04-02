@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiGlobe, FiShield, FiTarget, FiTrendingUp, FiUsers, FiZap } from 'react-icons/fi';
+import { useLanguage } from '../components';
 import './Mission.css';
 
 const values = [
@@ -35,27 +36,29 @@ const values = [
   },
 ];
 
-const Mission = () => (
+const Mission = () => {
+  const { tt } = useLanguage();
+  return (
   <div className="mission-root">
     <section className="mission-hero mission-glass">
       <div className="mission-hero-icon"><FiTarget /></div>
-      <h1>Empowering Retail Investors</h1>
+      <h1>{tt('Empowering Retail Investors')}</h1>
       <p>
-        Hamilton Services bridges the gap between institutional-grade portfolio analytics and everyday investors.
-        Everyone deserves access to sophisticated investment tools.
+        {tt('Hamilton Services bridges the gap between institutional-grade portfolio analytics and everyday investors.')}
+        {' '}
+        {tt('Everyone deserves access to sophisticated investment tools.')}
       </p>
     </section>
 
     <section className="mission-statement mission-glass">
-      <h2>Our Mission</h2>
+      <h2>{tt('Our Mission')}</h2>
       <blockquote>
-        To democratize portfolio analytics by providing every investor with intuitive tools to build,
-        analyze, and optimize investments using clear, data-driven insights.
+        {tt('To democratize portfolio analytics by providing every investor with intuitive tools to build, analyze, and optimize investments using clear, data-driven insights.')}
       </blockquote>
     </section>
 
     <section className="mission-values-section">
-      <h3>What We Stand For</h3>
+      <h3>{tt('What We Stand For')}</h3>
       <div className="mission-values-grid">
         {values.map((item) => {
           const Icon = item.icon;
@@ -71,9 +74,10 @@ const Mission = () => (
     </section>
 
     <footer className="mission-footnote">
-      Hamilton Services is built for educational and analytical purposes and does not constitute financial advice.
+      {tt('Hamilton Services is built for educational and analytical purposes and does not constitute financial advice.')}
     </footer>
   </div>
-);
+  );
+};
 
 export default Mission;

@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { FiTrendingUp, FiChevronDown } from 'react-icons/fi';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceLine, CartesianGrid } from 'recharts';
+import { useLanguage } from '../components';
 import './PerformanceDashboard.css';
 
 export default function PerformanceDashboard({ apiBase }) {
+  const { tt } = useLanguage();
   const [portfolios, setPortfolios] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [perfData, setPerfData] = useState(null);
@@ -79,14 +81,14 @@ export default function PerformanceDashboard({ apiBase }) {
   // Gain/loss since inception
   const gainLoss = perfData ? perfData.current_actual_value - perfData.investment_amount : 0;
 
-  if (loading) return <div className="perf-page"><div className="perf-loading">Loading portfolios...</div></div>;
+  if (loading) return <div className="perf-page"><div className="perf-loading">{tt('Loading portfolios...')}</div></div>;
   if (error) return <div className="perf-page"><div className="perf-error">{error}</div></div>;
   if (portfolios.length === 0) return (
     <div className="perf-page">
-      <div className="perf-empty">
+      <div className="perf-empty"> 
         <FiTrendingUp size={48} />
-        <p>No saved portfolios yet.</p>
-        <p>Save a portfolio from the Optimizer or Builder to track its performance.</p>
+        <p>{tt('No saved portfolios yet.')}</p>
+        <p>{tt('Save a portfolio from the Optimizer or Builder to track its performance.')}</p>
       </div>
     </div>
   );
@@ -94,7 +96,7 @@ export default function PerformanceDashboard({ apiBase }) {
   return (
     <div className="perf-page">
       <div className="perf-header">
-        <h2><FiTrendingUp /> Performance Dashboard</h2>
+        <h2><FiTrendingUp /> {tt('Performance Dashboard')}</h2>
         <div className="perf-selector">
           <FiChevronDown className="perf-selector-icon" />
           <select value={selectedId || ''} onChange={e => setSelectedId(parseInt(e.target.value))}>
@@ -105,48 +107,48 @@ export default function PerformanceDashboard({ apiBase }) {
         </div>
       </div>
 
-      {perfLoading && <div className="perf-loading">Loading performance data...</div>}
+      {perfLoading && <div className="perf-loading">{tt('Loading performance data...')}</div>}
 
       {perfData && !perfLoading && (
         <>
           <div className="perf-stats">
             <div className="perf-stat-card">
-              <div className="perf-stat-label">Invested</div>
+              <div className="perf-stat-label">{tt('Invested')}</div>
               <div className="perf-stat-value">{fmt(perfData.investment_amount)}</div>
             </div>
-            <div className={`perf-stat-card ${perfData.total_return_pct >= 0 ? 'positive' : 'negative'}`}>
-              <div className="perf-stat-label">Current Value</div>
+            <div className={`perf-stat-card ${perfData.total_return_pct >= 0 ? 'positive' : 'negative'}`}> 
+              <div className="perf-stat-label">{tt('Current Value')}</div>
               <div className="perf-stat-value">{fmt(perfData.current_actual_value)}</div>
               <div className={`perf-stat-delta ${gainLoss >= 0 ? 'up' : 'down'}`}>
                 {gainLoss >= 0 ? '+' : ''}{fmt(gainLoss)}
               </div>
             </div>
             <div className={`perf-stat-card ${perfData.total_return_pct >= 0 ? 'positive' : 'negative'}`}>
-              <div className="perf-stat-label">Actual Return</div>
+              <div className="perf-stat-label">{tt('Actual Return')}</div>
               <div className="perf-stat-value">{perfData.total_return_pct >= 0 ? '+' : ''}{perfData.total_return_pct.toFixed(2)}%</div>
             </div>
-            <div className="perf-stat-card">
-              <div className="perf-stat-label">Model Estimate</div>
+            <div className="perf-stat-card"> 
+              <div className="perf-stat-label">{tt('Model Estimate')}</div>
               <div className="perf-stat-value">{perfData.projected_return_pct >= 0 ? '+' : ''}{perfData.projected_return_pct.toFixed(2)}%</div>
-              <div className="perf-stat-note">FF5 projection</div>
+              <div className="perf-stat-note">{tt('FF5 projection')}</div>
             </div>
             <div className={`perf-stat-card ${perfData.alpha_pct >= 0 ? 'positive' : 'negative'}`}>
-              <div className="perf-stat-label">Alpha</div>
+              <div className="perf-stat-label">{tt('Alpha')}</div>
               <div className="perf-stat-value">{perfData.alpha_pct >= 0 ? '+' : ''}{perfData.alpha_pct.toFixed(2)}%</div>
             </div>
           </div>
 
           <div className="perf-chart-card">
-            <h3>Actual vs Model Projection</h3>
-            <p className="perf-chart-sub">{perfData.days_tracked} days tracked since {perfData.created_date}</p>
+            <h3>{tt('Actual vs Model Projection')}</h3>
+            <p className="perf-chart-sub">{perfData.days_tracked} {tt('days tracked since')} {perfData.created_date}</p>
             <p className="perf-chart-note">
-              The dashed line shows the theoretical growth path based on expected returns from the factor model, not a guarantee.
-              The solid line shows your portfolio's real market performance.
+              {tt('The dashed line shows the theoretical growth path based on expected returns from the factor model, not a guarantee.')} 
+              {tt("The solid line shows your portfolio's real market performance.")}
             </p>
             <ResponsiveContainer width="100%" height={380}>
               <LineChart data={perfData.series} margin={{ top: 10, right: 20, left: 15, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.15)" />
-                <XAxis dataKey="date" tick={{ fill: '#888', fontSize: 11 }} tickFormatter={d => d.slice(5)} />
+                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={40} tickFormatter={d => { try { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch { return d; } }} />
                 <YAxis
                   domain={yDomain}
                   tick={{ fill: '#888', fontSize: 11 }}
@@ -157,7 +159,7 @@ export default function PerformanceDashboard({ apiBase }) {
                   y={perfData.investment_amount}
                   stroke="rgba(148,163,184,0.5)"
                   strokeDasharray="4 4"
-                  label={{ value: 'Invested', fill: '#64748b', fontSize: 10, position: 'insideTopRight' }}
+                  label={{ value: tt('Invested'), fill: '#64748b', fontSize: 10, position: 'insideTopRight' }}
                 />
                 <Tooltip
                   contentStyle={{ background: '#1e2330', border: '1px solid #333', borderRadius: 8 }}
@@ -165,8 +167,8 @@ export default function PerformanceDashboard({ apiBase }) {
                   formatter={(v, name) => [fmt(v), name]}
                 />
                 <Legend />
-                <Line type="monotone" dataKey="actual" name="Actual" stroke="#00bcd4" strokeWidth={2.5} dot={false} />
-                <Line type="monotone" dataKey="projected" name="Model Estimate" stroke="#ff9800" strokeWidth={1.5} strokeDasharray="6 3" dot={false} opacity={0.7} />
+                <Line type="monotone" dataKey="actual" name={tt('Actual')} stroke="#00bcd4" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="projected" name={tt('Model Estimate')} stroke="#ff9800" strokeWidth={1.5} strokeDasharray="6 3" dot={false} opacity={0.7} />
               </LineChart>
             </ResponsiveContainer>
           </div>

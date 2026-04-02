@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { FiCrosshair, FiPlus, FiTrash2, FiRefreshCw } from 'react-icons/fi';
+import { FiCrosshair, FiPlus, FiTrash2, FiRefreshCw, FiSearch } from 'react-icons/fi';
+import { useLanguage } from '../components';
 import './Goals.css';
 
 export default function Goals({ apiBase }) {
+  const { tt } = useLanguage();
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -11,6 +13,9 @@ export default function Goals({ apiBase }) {
   const [formName, setFormName] = useState('');
   const [formThreshold, setFormThreshold] = useState('5');
   const [formAllocations, setFormAllocations] = useState([{ ticker: '', weight: '' }]);
+  const [tickerSuggestions, setTickerSuggestions] = useState([]);
+  const [activeAllocIdx, setActiveAllocIdx] = useState(null);
+  const tickerSearchTimer = useRef(null);
   const [creating, setCreating] = useState(false);
   const [rebalanceData, setRebalanceData] = useState({});
   const [portfolios, setPortfolios] = useState([]);
@@ -26,8 +31,8 @@ export default function Goals({ apiBase }) {
       setPortfolios(portRes.data.portfolios || []);
       setError('');
     } catch (err) {
-      if (err.response?.status === 401) setError('Please log in to manage goals.');
-      else setError('Failed to load goals.');
+      if (err.response?.status === 401) setError(tt('Please log in to manage goals.'));
+      else setError(tt('Failed to load goals.'));
     } finally {
       setLoading(false);
     }
@@ -38,8 +43,32 @@ export default function Goals({ apiBase }) {
   const addAllocationRow = () =>
     setFormAllocations(prev => [...prev, { ticker: '', weight: '' }]);
 
-  const updateAllocation = (idx, field, val) =>
+  const updateAllocation = (idx, field, val) => {
     setFormAllocations(prev => prev.map((r, i) => i === idx ? { ...r, [field]: val } : r));
+    if (field === 'ticker') {
+      clearTimeout(tickerSearchTimer.current);
+      if (val.trim().length >= 1) {
+        setActiveAllocIdx(idx);
+        tickerSearchTimer.current = setTimeout(async () => {
+          try {
+            const res = await axios.get(`${apiBase}/stocks/search?q=${encodeURIComponent(val.trim())}&limit=6`);
+            setTickerSuggestions(res.data?.stocks || res.data || []);
+          } catch {
+            setTickerSuggestions([]);
+          }
+        }, 300);
+      } else {
+        setTickerSuggestions([]);
+        setActiveAllocIdx(null);
+      }
+    }
+  };
+
+  const selectTickerSuggestion = (idx, ticker) => {
+    setFormAllocations(prev => prev.map((r, i) => i === idx ? { ...r, ticker } : r));
+    setTickerSuggestions([]);
+    setActiveAllocIdx(null);
+  };
 
   const removeAllocation = (idx) =>
     setFormAllocations(prev => prev.filter((_, i) => i !== idx));
@@ -67,7 +96,7 @@ export default function Goals({ apiBase }) {
       setShowForm(false);
       fetchGoals();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create goal.');
+      setError(err.response?.data?.detail || tt('Failed to create goal.'));
     } finally {
       setCreating(false);
     }
@@ -78,7 +107,7 @@ export default function Goals({ apiBase }) {
       await axios.delete(`${apiBase}/goals/${id}`);
       setGoals(prev => prev.filter(g => g.id !== id));
     } catch {
-      setError('Failed to delete goal.');
+      setError(tt('Failed to delete goal.'));
     }
   };
 
@@ -87,20 +116,30 @@ export default function Goals({ apiBase }) {
       const res = await axios.get(`${apiBase}/goals/${goalId}/rebalance`);
       setRebalanceData(prev => ({ ...prev, [goalId]: res.data }));
     } catch {
-      setError('Failed to compute rebalance suggestions.');
+      setError(tt('Failed to compute rebalance suggestions.'));
     }
   };
 
-  if (loading) return <div className="goals-page"><div className="goals-loading">Loading goals...</div></div>;
+  if (loading) return <div className="goals-page"><div className="goals-loading">{tt('Loading goals...')}</div></div>;
   if (error && goals.length === 0) return <div className="goals-page"><div className="goals-error">{error}</div></div>;
 
   return (
     <div className="goals-page">
       <div className="goals-header">
-        <h2><FiCrosshair /> Goals & Targets</h2>
+        <h2><FiCrosshair /> {tt('Goals & Targets')}</h2>
         <button className="goals-btn goals-add-btn" onClick={() => setShowForm(!showForm)}>
-          <FiPlus /> New Goal
+          <FiPlus /> {tt('New Goal')}
         </button>
+      </div>
+
+      <div className="goals-explainer">
+        <h3>{tt('What are Goals?')}</h3>
+        <p>{tt('Goals let you define target portfolio allocations by ticker and weight. The platform then monitors how much your real holdings have drifted from those targets and tells you exactly what to buy or sell to rebalance. Link a goal to any saved portfolio for automatic drift tracking.')}</p>
+        <ul>
+          <li>{tt('Target Allocations - specify each ticker and its ideal weight (e.g. AAPL 30%, MSFT 20%).')}</li>
+          <li>{tt('Drift Threshold - trigger a rebalance alert when any position drifts more than N% from target.')}</li>
+          <li>{tt('Check Rebalance - see a trade-by-trade action plan (buy/sell/hold) with dollar amounts and share counts.')}</li>
+        </ul>
       </div>
 
       {error && <div className="goals-error">{error}</div>}
@@ -108,29 +147,56 @@ export default function Goals({ apiBase }) {
       {showForm && (
         <form className="goals-form" onSubmit={handleCreate}>
           <div className="goals-form-row">
-            <input type="text" placeholder="Goal name" value={formName} onChange={e => setFormName(e.target.value)} required />
-            <input type="number" step="0.5" placeholder="Drift threshold %" value={formThreshold} onChange={e => setFormThreshold(e.target.value)} min="1" max="50" style={{ maxWidth: 140 }} />
+            <input type="text" placeholder={tt('Goal name')} value={formName} onChange={e => setFormName(e.target.value)} required />
+            <input type="number" step="0.5" placeholder={tt('Drift threshold %')} value={formThreshold} onChange={e => setFormThreshold(e.target.value)} min="1" max="50" style={{ maxWidth: 140 }} />
             {portfolios.length > 0 && (
               <select value={formPortfolioId} onChange={e => setFormPortfolioId(e.target.value)}>
-                <option value="">No linked portfolio</option>
+                <option value="">{tt('No linked portfolio')}</option>
                 {portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             )}
           </div>
-          <div className="goals-alloc-label">Target Allocations (must sum to 100%)</div>
+          <div className="goals-alloc-label">{tt('Target Allocations (must sum to 100%)')}</div>
           {formAllocations.map((row, i) => (
             <div key={i} className="goals-form-row goals-alloc-row">
-              <input type="text" placeholder="Ticker" value={row.ticker} onChange={e => updateAllocation(i, 'ticker', e.target.value)} maxLength={10} />
-              <input type="number" step="0.1" placeholder="Weight %" value={row.weight} onChange={e => updateAllocation(i, 'weight', e.target.value)} min="0" max="100" />
+              <div className="goals-ticker-wrap">
+                <FiSearch className="goals-ticker-icon" size={13} />
+                <input
+                  type="text"
+                  placeholder={tt('Ticker (e.g. AAPL)')}
+                  value={row.ticker}
+                  onChange={e => updateAllocation(i, 'ticker', e.target.value)}
+                  onBlur={() => setTimeout(() => { setTickerSuggestions([]); setActiveAllocIdx(null); }, 150)}
+                  maxLength={10}
+                  autoComplete="off"
+                  className="goals-ticker-input"
+                />
+                {activeAllocIdx === i && tickerSuggestions.length > 0 && (
+                  <div className="goals-ticker-dropdown">
+                    {tickerSuggestions.map(s => (
+                      <button
+                        key={s.ticker}
+                        type="button"
+                        className="goals-ticker-option"
+                        onMouseDown={() => selectTickerSuggestion(i, s.ticker)}
+                      >
+                        <span className="goals-ticker-sym">{s.ticker}</span>
+                        <span className="goals-ticker-name">{s.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <input type="number" step="0.1" placeholder={tt('Weight %')} value={row.weight} onChange={e => updateAllocation(i, 'weight', e.target.value)} min="0" max="100" />
               {formAllocations.length > 1 && (
                 <button type="button" className="goals-remove-alloc" onClick={() => removeAllocation(i)}>&times;</button>
               )}
             </div>
           ))}
           <div className="goals-form-actions">
-            <button type="button" className="goals-btn" onClick={addAllocationRow}>+ Add Ticker</button>
+            <button type="button" className="goals-btn" onClick={addAllocationRow}>+ {tt('Add Ticker')}</button>
             <button type="submit" className="goals-btn goals-submit-btn" disabled={creating}>
-              {creating ? 'Creating...' : 'Create Goal'}
+              {creating ? tt('Creating...') : tt('Create Goal')}
             </button>
           </div>
         </form>
@@ -139,8 +205,8 @@ export default function Goals({ apiBase }) {
       {goals.length === 0 ? (
         <div className="goals-empty">
           <FiCrosshair size={48} />
-          <p>No goals yet.</p>
-          <p>Set target allocations and get automatic rebalancing suggestions.</p>
+          <p>{tt('No goals yet.')}</p>
+          <p>{tt('Set target allocations and get automatic rebalancing suggestions.')}</p>
         </div>
       ) : (
         <div className="goals-list">
@@ -152,14 +218,14 @@ export default function Goals({ apiBase }) {
                 <div className="goal-top">
                   <div>
                     <h3 className="goal-name">{g.name}</h3>
-                    {g.portfolio_name && <span className="goal-portfolio">Linked: {g.portfolio_name}</span>}
-                    <span className="goal-threshold">Rebalance if drift &gt; {g.rebalance_threshold}%</span>
+                    {g.portfolio_name && <span className="goal-portfolio">{tt('Linked')}: {g.portfolio_name}</span>}
+                    <span className="goal-threshold">{tt('Rebalance if drift >')} {g.rebalance_threshold}%</span>
                   </div>
                   <div className="goal-actions">
-                    <button className="goals-btn" onClick={() => fetchRebalance(g.id)} title="Check rebalance">
-                      <FiRefreshCw size={14} /> Check
+                    <button className="goals-btn" onClick={() => fetchRebalance(g.id)} title={tt('Check rebalance')}>
+                      <FiRefreshCw size={14} /> {tt('Check')}
                     </button>
-                    <button className="goal-delete-btn" onClick={() => handleDelete(g.id)} title="Delete">
+                    <button className="goal-delete-btn" onClick={() => handleDelete(g.id)} title={tt('Delete')}>
                       <FiTrash2 size={14} />
                     </button>
                   </div>
@@ -175,15 +241,15 @@ export default function Goals({ apiBase }) {
                   <div className={`goal-rebalance ${rb.needs_rebalance ? 'needs' : 'ok'}`}>
                     <div className="goal-rb-header">
                       {rb.needs_rebalance
-                        ? <span className="goal-rb-badge needs">Rebalance Needed</span>
-                        : <span className="goal-rb-badge ok">On Target</span>
+                        ? <span className="goal-rb-badge needs">{tt('Rebalance Needed')}</span>
+                        : <span className="goal-rb-badge ok">{tt('On Target')}</span>
                       }
-                      <span className="goal-rb-drift">Max drift: {rb.max_drift_pct}%</span>
+                      <span className="goal-rb-drift">{tt('Max drift')}: {rb.max_drift_pct}%</span>
                     </div>
                     {rb.trades.filter(t => t.action !== 'hold').length > 0 && (
                       <table className="goal-trades-table">
                         <thead>
-                          <tr><th>Ticker</th><th>Action</th><th>Drift</th><th>Amount</th><th>Shares</th></tr>
+                          <tr><th>{tt('Ticker')}</th><th>{tt('Action')}</th><th>{tt('Drift')}</th><th>{tt('Amount')}</th><th>{tt('Shares')}</th></tr>
                         </thead>
                         <tbody>
                           {rb.trades.filter(t => t.action !== 'hold').map(t => (

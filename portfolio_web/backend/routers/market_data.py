@@ -24,14 +24,17 @@ _table_cache: dict[str, bool] = {}
 EXCHANGE_MAP = {
     "NYQ": "NYSE",
     "NMS": "NASDAQ",
-    "NGM": "NASDAQ Capital",
-    "YHD": "Yahoo",
-    "NCM": "NASDAQ",
+    "NGM": "NASDAQ",   # NASDAQ Capital Market → NASDAQ
+    "NCM": "NASDAQ",   # NASDAQ Capital Market (small cap) → NASDAQ
+    "NIM": "NASDAQ",   # NASDAQ Global Market → NASDAQ
+    "YHD": "OTC",      # Yahoo Finance default → OTC
     "PCX": "NYSE Arca",
     "ASE": "NYSE American",
     "BTS": "CBOE",
-    "PNK": "Pink Sheets",
+    "PNK": "OTC",
     "OQB": "OTC",
+    "PINX": "OTC",
+    "GREY": "OTC",
 }
 
 
@@ -469,10 +472,14 @@ async def get_stock_details(ticker: str):
         with get_cursor(dict_cursor=True) as (_, cur):
             cur.execute(
                 """
-                SELECT ticker, name, exchange, sector, pe_ratio, roe, beta,
-                       market_cap, revenue, dividend_yield, asset_class
-                FROM stocks
-                WHERE ticker = %s
+                SELECT s.ticker, s.name, s.exchange, s.sector, s.pe_ratio, s.roe, s.beta,
+                       s.market_cap, s.revenue, s.dividend_yield, s.asset_class,
+                       s.debt_to_equity, s.esg_score, s.carbon_intensity,
+                       m.expected_return, m.volatility, m.alpha, m.r2,
+                       m.beta_mkt, m.sample_months, m.confidence_score
+                FROM stocks s
+                LEFT JOIN asset_metrics m ON m.ticker = s.ticker
+                WHERE s.ticker = %s
                 """,
                 (ticker.upper(),),
             )
@@ -495,6 +502,15 @@ async def get_stock_details(ticker: str):
         result = dict(stock)
         if result.get("exchange"):
             result["exchange"] = EXCHANGE_MAP.get(result["exchange"], result["exchange"])
+
+        # Sanitise floats
+        for key in ["expected_return", "volatility", "alpha", "r2", "beta_mkt",
+                    "confidence_score", "pe_ratio", "roe", "beta", "market_cap",
+                    "revenue", "dividend_yield", "debt_to_equity", "esg_score",
+                    "carbon_intensity"]:
+            val = result.get(key)
+            if isinstance(val, (float, int)) and (math.isinf(val) or math.isnan(val)):
+                result[key] = None
 
         if latest_price:
             result["current_price"] = float(latest_price["close"])

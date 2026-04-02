@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { FiExternalLink } from 'react-icons/fi';
 import { HelpIcon } from '../components';
+import { useLanguage } from '../components';
 import './SharedPortfolio.css';
 
 const asNumber = (value, fallback = 0) => {
@@ -20,6 +21,7 @@ const formatCurrency = (value) =>
   asNumber(value).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
 const SharedPortfolio = ({ apiBase }) => {
+  const { tt } = useLanguage();
   const { shareToken } = useParams();
   const [portfolio, setPortfolio] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ const SharedPortfolio = ({ apiBase }) => {
         const response = await axios.get(`${apiBase}/shared/${shareToken}`);
         setPortfolio(response.data);
       } catch (err) {
-        setError(err.response?.data?.detail || 'Portfolio not found or link has expired.');
+        setError(err.response?.data?.detail || tt('Portfolio not found or link has expired.'));
       } finally {
         setLoading(false);
       }
@@ -44,7 +46,7 @@ const SharedPortfolio = ({ apiBase }) => {
       <div className="page-container shared-portfolio-root">
         <div className="page-header">
           <h1>Shared Portfolio</h1>
-          <p className="page-subtitle">Loading…</p>
+          <p className="page-subtitle">{tt('Loading...')}</p>
         </div>
       </div>
     );
@@ -54,7 +56,7 @@ const SharedPortfolio = ({ apiBase }) => {
     return (
       <div className="page-container shared-portfolio-root">
         <div className="page-header">
-          <h1>Shared Portfolio</h1>
+          <h1>{tt('Shared Portfolio')}</h1>
           <p className="page-subtitle shared-error">{error}</p>
         </div>
       </div>
@@ -81,13 +83,13 @@ const SharedPortfolio = ({ apiBase }) => {
       </div>
 
       <div className="shared-badge">
-        <FiExternalLink /> Read-only shared view
+        <FiExternalLink /> {tt('Read-only shared view')}
       </div>
 
       {/* Summary metrics */}
       <div className="shared-metrics-grid">
         <div className="shared-metric-card">
-          <span className="shared-metric-label">Investment</span>
+          <span className="shared-metric-label">{tt('Investment')}</span>
           <span className="shared-metric-value">{formatCurrency(investment)}</span>
         </div>
         <div className="shared-metric-card">

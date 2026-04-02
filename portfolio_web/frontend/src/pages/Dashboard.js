@@ -20,7 +20,7 @@ import {
   FiTrendingDown,
   FiTrendingUp,
 } from 'react-icons/fi';
-import { HelpIcon } from '../components';
+import { HelpIcon, useLanguage } from '../components';
 import './Dashboard.css';
 
 const PERIOD_MONTHS = [
@@ -124,6 +124,7 @@ const aggregateTopHoldings = (portfolios, totalInvested) => {
 };
 
 const Dashboard = ({ apiBase }) => {
+  const { tt } = useLanguage();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savedPortfolios, setSavedPortfolios] = useState([]);
@@ -265,7 +266,7 @@ const Dashboard = ({ apiBase }) => {
       <div className="dashboard-root">
         <div className="dashboard-header">
           <div>
-            <p className="dashboard-overline">Welcome back</p>
+            <p className="dashboard-overline">{tt('Welcome back')}</p>
             <h2 className="dashboard-title">Investor</h2>
           </div>
         </div>
@@ -282,34 +283,34 @@ const Dashboard = ({ apiBase }) => {
     <div className="dashboard-root">
       <div className="dashboard-header">
         <div>
-          <p className="dashboard-overline">Welcome back</p>
-          <h2 className="dashboard-title">Portfolio Command Center</h2>
+          <p className="dashboard-overline">{tt('Welcome back')}</p>
+          <h2 className="dashboard-title">{tt('Portfolio Command Center')}</h2>
         </div>
-        <p className="dashboard-updated">Last updated: {new Date().toLocaleString()}</p>
+        <p className="dashboard-updated">{tt('Last updated')}: {new Date().toLocaleString()}</p>
       </div>
 
       <div className="dashboard-kpis-grid">
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>Total Portfolio Value <HelpIcon text="The estimated current value of all your saved portfolios combined, based on original investment plus expected gains." /></span>
+            <span>{tt('Projected Portfolio Value')} <HelpIcon text="The estimated 1-year value of all your saved portfolios, based on original investment plus each portfolio's model-expected annual return (Fama-French 5-factor). Not a guarantee of future performance." /></span>
             <FiDollarSign />
           </header>
           <strong>{formatCurrency(portfolioMetrics.totalCurrentValue)}</strong>
-          <p>{formatPercent(portfolioMetrics.totalGainLossPct)} expected annual</p>
+          <p>{tt('Invested')}: {formatCurrency(portfolioMetrics.totalInvested)}</p>
         </article>
 
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>Expected Gain/Loss <HelpIcon text="Projected annual profit or loss across all your portfolios, based on the Fama-French 5-factor model's expected returns." /></span>
+            <span>{tt('Projected Gain/Loss')} <HelpIcon text="Expected annual profit or loss across all your portfolios based on the Fama-French 5-factor model. This is a model estimate, not realized gain." /></span>
             {portfolioMetrics.totalGainLoss >= 0 ? <FiTrendingUp /> : <FiTrendingDown />}
           </header>
-          <strong>{formatCurrency(portfolioMetrics.totalGainLoss)}</strong>
-          <p>{formatPercent(portfolioMetrics.avgExpectedReturn)} annual return</p>
+          <strong className={portfolioMetrics.totalGainLoss >= 0 ? 'positive' : 'negative'}>{formatCurrency(portfolioMetrics.totalGainLoss)}</strong>
+          <p>{formatPercent(portfolioMetrics.totalGainLossPct, 1)} vs invested capital</p>
         </article>
 
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>Active Portfolios <HelpIcon text="Number of portfolios you've saved. Each portfolio is a collection of stocks, ETFs, or bonds with specific allocations." /></span>
+            <span>{tt('Active Portfolios')} <HelpIcon text="Number of portfolios you've saved. Each portfolio is a collection of stocks, ETFs, or bonds with specific allocations." /></span>
             <FiBriefcase />
           </header>
           <strong>{portfolioMetrics.activeCount}</strong>
@@ -318,18 +319,20 @@ const Dashboard = ({ apiBase }) => {
 
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>vs S&P 500 <HelpIcon text="How your portfolios' expected return compares to the S&P 500's historical average of ~9% annually. Positive means outperforming the market benchmark." /></span>
+            <span>{tt('S&P 500 Return')} <HelpIcon text="The S&P 500 index return for the selected performance period. Compare this to your own portfolio's expected return to gauge relative performance." /></span>
             <FiBarChart2 />
           </header>
-          <strong>{formatPercent(portfolioMetrics.avgExpectedReturn - 9, 1)}</strong>
-          <p>Market P/E {stats?.statistics?.avg_pe?.toFixed(1) || 'N/A'}</p>
+          <strong className={perfData?.sp500_return_pct >= 0 ? 'positive' : 'negative'}>
+            {perfData?.sp500_return_pct != null ? formatPercent(perfData.sp500_return_pct, 1) : 'N/A'}
+          </strong>
+          <p>Your est. return: {formatPercent(portfolioMetrics.avgExpectedReturn, 1)} /yr</p>
         </article>
       </div>
 
       <section className="dashboard-glass dashboard-performance-card">
         <div className="dashboard-section-head">
           <div>
-            <h3>Performance</h3>
+            <h3>{tt('Performance')}</h3>
             <p>Combined portfolio value vs S&P 500 (SPY)</p>
           </div>
           <div className="dashboard-period-controls">
@@ -347,10 +350,10 @@ const Dashboard = ({ apiBase }) => {
         </div>
 
         <div className="dashboard-chart-wrap">
-          {perfLoading && <div className="dashboard-chart-loading">Loading performance data...</div>}
+          {perfLoading && <div className="dashboard-chart-loading">{tt('Loading performance data...')}</div>}
           {!perfLoading && trendSeries.length === 0 && (
             <div className="dashboard-chart-empty">
-              <p>No performance data available. Save a portfolio to start tracking.</p>
+              <p>{tt('No performance data available. Save a portfolio to start tracking.')}</p>
             </div>
           )}
           {!perfLoading && trendSeries.length > 0 && (
@@ -364,8 +367,12 @@ const Dashboard = ({ apiBase }) => {
                   tickLine={false}
                   tickFormatter={(d) => {
                     if (!d) return '';
-                    const parts = d.split('-');
-                    return parts.length >= 2 ? `${parts[1]}/${parts[2] || ''}` : d;
+                    try {
+                      const date = new Date(d + 'T12:00:00');
+                      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    } catch {
+                      return d;
+                    }
                   }}
                   interval="preserveStartEnd"
                   minTickGap={40}
@@ -425,25 +432,25 @@ const Dashboard = ({ apiBase }) => {
         <section className="dashboard-glass">
           <div className="dashboard-section-head">
             <div>
-              <h3>Top Holdings</h3>
-              <p>Largest allocations across portfolios</p>
+              <h3>{tt('Top Holdings')}</h3>
+              <p>{tt('Largest allocations across portfolios')}</p>
             </div>
           </div>
           <div className="dashboard-table-wrap">
             <table className="dashboard-table">
               <thead>
                 <tr>
-                  <th>Asset</th>
-                  <th>Allocation <HelpIcon text="The percentage of your total portfolio value that this holding represents." /></th>
-                  <th>Value</th>
-                  <th>Exp. Return <HelpIcon text="The annualized return expected for this stock based on factor models. Not a guarantee of future performance." /></th>
+                  <th>{tt('Asset')}</th>
+                  <th>{tt('Allocation')} <HelpIcon text="The percentage of your total portfolio value that this holding represents." /></th>
+                  <th>{tt('Value')}</th>
+                  <th>{tt('Exp. Return')} <HelpIcon text="The annualized return expected for this stock based on factor models. Not a guarantee of future performance." /></th>
                 </tr>
               </thead>
               <tbody>
                 {topHoldings.length === 0 && (
                   <tr>
                     <td colSpan={4} className="dashboard-empty-cell">
-                      No holdings yet. <Link to="/portfolio" className="dashboard-inline-link">Generate a portfolio</Link> to get started.
+                      {tt('No holdings yet.')} <Link to="/portfolio" className="dashboard-inline-link">{tt('Generate a portfolio')}</Link> {tt('to get started.')}
                     </td>
                   </tr>
                 )}
@@ -465,14 +472,14 @@ const Dashboard = ({ apiBase }) => {
         <section className="dashboard-glass">
           <div className="dashboard-section-head">
             <div>
-              <h3>Recent Activity</h3>
-              <p>Most recently saved portfolios</p>
+              <h3>{tt('Recent Activity')}</h3>
+              <p>{tt('Most recently saved portfolios')}</p>
             </div>
           </div>
           <div className="dashboard-activity-list">
-            {savedLoading && <p className="dashboard-muted">Loading activity…</p>}
+            {savedLoading && <p className="dashboard-muted">{tt('Loading activity...')}</p>}
             {!savedLoading && recentPortfolios.length === 0 && (
-              <p className="dashboard-muted">No recent activity. <Link to="/portfolio" className="dashboard-inline-link">Create your first portfolio</Link> to start tracking.</p>
+              <p className="dashboard-muted">{tt('No recent activity.')} <Link to="/portfolio" className="dashboard-inline-link">{tt('Create your first portfolio')}</Link> {tt('to start tracking.')}</p>
             )}
             {!savedLoading && recentPortfolios.map((item) => (
               <button key={item.id} type="button" className="dashboard-activity-item" onClick={() => openInBuilder(item)}>
@@ -480,7 +487,12 @@ const Dashboard = ({ apiBase }) => {
                   <strong>{item.name}</strong>
                   <span>{new Date(item.created_at).toLocaleDateString()}</span>
                 </div>
-                <em>{formatCurrency(item.investmentAmount)}</em>
+                <div className="dashboard-activity-value">
+                  <em>{formatCurrency(item.estimatedCurrentValue)}</em>
+                  <small className={item.estimatedCurrentValue >= item.investmentAmount ? 'positive' : 'negative'}>
+                    {item.estimatedCurrentValue >= item.investmentAmount ? '+' : ''}{formatPercent((item.estimatedCurrentValue - item.investmentAmount) / item.investmentAmount * 100, 1)}
+                  </small>
+                </div>
               </button>
             ))}
           </div>
@@ -490,11 +502,11 @@ const Dashboard = ({ apiBase }) => {
       <section className="dashboard-portfolio-cards">
         <div className="dashboard-section-head">
           <div>
-            <h3>Saved Portfolios</h3>
-            <p>Quick access to edit and review</p>
+            <h3>{tt('Saved Portfolios')}</h3>
+            <p>{tt('Quick access to edit and review')}</p>
           </div>
           <Link to="/portfolio-builder" className="dashboard-link-btn">
-            View All <FiArrowRight />
+            {tt('View All')} <FiArrowRight />
           </Link>
         </div>
         <div className="dashboard-cards-grid">
@@ -513,7 +525,7 @@ const Dashboard = ({ apiBase }) => {
                     <button
                       type="button"
                       className="dashboard-share-btn"
-                      title="Share portfolio"
+                      title={tt('Share portfolio')}
                       onClick={(e) => sharePortfolio(e, item.id)}
                     >
                       <FiShare2 size={14} />
@@ -522,15 +534,21 @@ const Dashboard = ({ apiBase }) => {
                 </span>
               </header>
               <div>
-                <p>Holdings</p>
+                <p>{tt('Holdings')}</p>
                 <strong>{item.holdings.length}</strong>
               </div>
               <div>
-                <p>Investment</p>
+                <p>{tt('Invested')}</p>
                 <strong>{formatCurrency(item.investmentAmount)}</strong>
               </div>
               <div>
-                <p>Expected Return <HelpIcon text="Annualized expected return based on factor model analysis. Positive values suggest the portfolio is projected to grow." /></p>
+                <p>{tt('Est. Value')}</p>
+                <strong className={item.estimatedCurrentValue >= item.investmentAmount ? 'positive' : 'negative'}>
+                  {formatCurrency(item.estimatedCurrentValue)}
+                </strong>
+              </div>
+              <div>
+                <p>{tt('Expected Return')} <HelpIcon text="Annualized expected return based on factor model analysis. Positive values suggest the portfolio is projected to grow." /></p>
                 <strong className={item.expectedReturnPct >= 0 ? 'positive' : 'negative'}>
                   {item.expectedReturnPct >= 0 ? '▲ ' : '▼ '}{formatPercent(item.expectedReturnPct, 1)}
                 </strong>
@@ -539,10 +557,10 @@ const Dashboard = ({ apiBase }) => {
           ))}
           {recentPortfolios.length === 0 && !savedLoading && (
             <div className="dashboard-glass dashboard-empty-card">
-              <p>No portfolios yet. Build one with optimizer or builder.</p>
+              <p>{tt('No portfolios yet. Build one with optimizer or builder.')}</p>
               <div>
-                <Link to="/portfolio" className="dashboard-link-btn">Use Optimizer</Link>
-                <Link to="/portfolio-builder" className="dashboard-link-btn alt">Manual Build</Link>
+                <Link to="/portfolio" className="dashboard-link-btn">{tt('Use Optimizer')}</Link>
+                <Link to="/portfolio-builder" className="dashboard-link-btn alt">{tt('Manual Build')}</Link>
               </div>
             </div>
           )}

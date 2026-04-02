@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { FiX, FiSearch, FiTrendingUp, FiTrendingDown } from 'react-icons/fi';
-import { HelpIcon } from '../components';
+import { HelpIcon, useLanguage } from '../components';
 import { downloadCsv } from '../utils/exportCsv';
 import './StockComparison.css';
 
@@ -42,6 +42,7 @@ const METRIC_ROWS = [
 ];
 
 const StockComparison = ({ apiBase }) => {
+  const { tt } = useLanguage();
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [selectedStocks, setSelectedStocks] = useState([]);
@@ -122,7 +123,7 @@ const StockComparison = ({ apiBase }) => {
       <div className="page-header">
         <h1>Stock Comparison</h1>
         <p className="page-subtitle">
-          Compare fundamentals and metrics for up to 6 stocks side-by-side
+          {tt('Compare fundamentals and metrics for up to 6 stocks side-by-side')}
         </p>
       </div>
 
@@ -133,7 +134,7 @@ const StockComparison = ({ apiBase }) => {
           <input
             type="text"
             className="stock-search-input"
-            placeholder="Search by ticker or company name…"
+            placeholder={tt('Search by ticker or company name...')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             maxLength={50}
@@ -174,14 +175,14 @@ const StockComparison = ({ apiBase }) => {
         <>
           <div className="comparison-actions">
             <button className="comparison-export-btn" onClick={handleExport}>
-              Export Comparison CSV
+              {tt('Export Comparison CSV')}
             </button>
           </div>
           <div className="comparison-table-wrap">
             <table className="comparison-table">
               <thead>
                 <tr>
-                  <th className="comparison-label-col">Metric</th>
+                  <th className="comparison-label-col">{tt('Metric')}</th>
                   {comparedStocks.map((s, i) => (
                     <th key={i}>
                       <div className="comparison-col-head">
@@ -217,15 +218,15 @@ const StockComparison = ({ apiBase }) => {
                 })}
                 {/* Price trend indicator */}
                 <tr>
-                  <td className="comparison-label-col">Trend (β)</td>
+                  <td className="comparison-label-col">{tt('Trend (beta)')}</td>
                   {comparedStocks.map((s, i) => {
                     const beta = asNumber(s.beta);
                     return (
                       <td key={i}>
                         {beta >= 1 ? (
-                          <span className="trend-up"><FiTrendingUp /> Aggressive</span>
+                          <span className="trend-up"><FiTrendingUp /> {tt('Aggressive')}</span>
                         ) : beta > 0 ? (
-                          <span className="trend-down"><FiTrendingDown /> Defensive</span>
+                          <span className="trend-down"><FiTrendingDown /> {tt('Defensive')}</span>
                         ) : (
                           <span>—</span>
                         )}
@@ -242,13 +243,13 @@ const StockComparison = ({ apiBase }) => {
       {selectedStocks.length === 1 && comparedStocks.length <= 1 && (
         <p className="comparison-hint">
           {comparedStocks.length === 0
-            ? 'Loading stock data…'
-            : 'Add at least one more stock to compare.'}
+            ? tt('Loading stock data...')
+            : tt('Add at least one more stock to compare.')}
         </p>
       )}
 
       {selectedStocks.length === 0 && (
-        <p className="comparison-hint">Search and select stocks above to begin comparing.</p>
+        <p className="comparison-hint">{tt('Search and select stocks above to begin comparing.')}</p>
       )}
     </div>
   );
