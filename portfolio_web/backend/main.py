@@ -47,7 +47,7 @@ _request_count = 0
 _error_count = 0
 _total_latency_ms = 0.0
 _auth_limiter = SlidingWindowRateLimiter(limit=AUTH_RATE_LIMIT, window_seconds=RATE_LIMIT_WINDOW_SECONDS)
-_login_limiter = SlidingWindowRateLimiter(limit=5, window_seconds=300)
+_login_limiter = SlidingWindowRateLimiter(limit=20, window_seconds=300)
 _password_reset_limiter = SlidingWindowRateLimiter(limit=3, window_seconds=600)
 _password_reset_confirm_limiter = SlidingWindowRateLimiter(limit=5, window_seconds=900)
 _register_limiter = SlidingWindowRateLimiter(limit=10, window_seconds=600)
