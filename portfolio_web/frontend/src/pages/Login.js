@@ -6,7 +6,7 @@ import './Login.css';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const PROD_API_BASE = 'https://hamilton-services-backend.onrender.com/api';
-const REQUEST_TIMEOUT = IS_PRODUCTION ? 45000 : 10000;
+const REQUEST_TIMEOUT = IS_PRODUCTION ? 90000 : 10000;
 const normalizeApiBase = (value) => String(value || '').trim().replace(/\/+$/, '');
 const isLocalApiBase = (value) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(String(value || '').trim());
 
@@ -165,7 +165,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
       
       if (err.code === 'ECONNABORTED') {
         errorMessage = IS_PRODUCTION
-          ? 'The server is taking longer than expected to respond. Please try again in a moment.'
+          ? 'The server is waking up from sleep — this can take up to 60 seconds on the free tier. Please wait a moment and try again.'
           : 'Request timeout. Is the backend running on port 8000?';
       } else if (err.message === 'Network Error') {
         errorMessage = IS_PRODUCTION

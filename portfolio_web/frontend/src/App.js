@@ -161,7 +161,7 @@ function AppContent() {
 
       if (stored || csrfCookie) {
         try {
-          const response = await axios.get(`${API_BASE}/auth/me`, { timeout: 5000, withCredentials: true });
+          const response = await axios.get(`${API_BASE}/auth/me`, { timeout: 30000, withCredentials: true });
           const user = response?.data;
           if (user?.email) {
             setAuthUser(user);
@@ -171,8 +171,12 @@ function AppContent() {
             return;
           }
         } catch (_err) {
-          // Session validation failed — clear stale cached user
-          localStorage.removeItem('authUser');
+          // Only clear the session on a definitive 401 (invalid/expired token).
+          // Do NOT clear on timeout or network errors — that would falsely log out
+          // users when the Render free-tier backend is cold-starting.
+          if (_err?.response?.status === 401) {
+            localStorage.removeItem('authUser');
+          }
         }
       }
 
