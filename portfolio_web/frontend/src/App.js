@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
@@ -70,7 +70,15 @@ const API_BASE = (() => {
   return ENV_API_BASE || '/api';
 })();
 const ADMIN_ALLOWED_EMAIL = 'loris@spatafora.ca';
-axios.defaults.withCredentials = false;
+const DEFAULT_API_TIMEOUT_MS = IS_PRODUCTION ? 45000 : 15000;
+const LONG_RUNNING_API_TIMEOUT_MS = IS_PRODUCTION ? 60000 : 25000;
+const API_NOTICE_EVENT = 'hamilton-api-notice';
+
+const emitApiNotice = (detail) => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(API_NOTICE_EVENT, { detail }));
+  }
+};
 
 const shouldSendCredentials = (requestUrl) => {
   const url = String(requestUrl || '');
@@ -86,11 +94,56 @@ const shouldSendCredentials = (requestUrl) => {
   );
 };
 
+const isLongRunningRequest = (requestUrl) => /\/portfolio\/(optimize-weights|efficient-frontier|historical-performance|benchmark-analytics|backtest|stress-test|risk-decomposition|drift-monitor|style-analysis|brinson-attribution)|\/dashboard-performance/.test(String(requestUrl || ''));
+
+const buildApiNotice = (error) => {
+  if (error?.response?.status === 401) {
+    return null;
+  }
+
+  if (error?.response?.status === 429) {
+    return {
+      level: 'info',
+      health: 'degraded',
+      message: 'We’re processing a lot of requests right now. Please wait about 30–60 seconds and try again.',
+    };
+  }
+
+  if (error?.code === 'ECONNABORTED' || /timeout/i.test(String(error?.message || ''))) {
+    return {
+      level: 'warning',
+      health: 'degraded',
+      message: 'The live data service is taking longer than usual. Please wait about 30–90 seconds and try again — your session and saved portfolios are still safe.',
+    };
+  }
+
+  if (!error?.response || error?.message === 'Network Error' || [502, 503, 504].includes(error?.response?.status)) {
+    return {
+      level: 'warning',
+      health: 'error',
+      message: 'We’re having trouble reaching the analytics service right now. Please wait about 30–90 seconds while it reconnects, then try again.',
+    };
+  }
+
+  if ((error?.response?.status || 0) >= 500) {
+    return {
+      level: 'warning',
+      health: 'degraded',
+      message: 'The analytics engine is temporarily busy. Please wait about 30–90 seconds and retry your request.',
+    };
+  }
+
+  return null;
+};
+
 const getCookieValue = (name) => {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = document.cookie.match(new RegExp(`(?:^|; )${escapedName}=([^;]*)`));
   return match ? decodeURIComponent(match[1]) : null;
 };
+
+axios.defaults.withCredentials = false;
+axios.defaults.timeout = DEFAULT_API_TIMEOUT_MS;
 
 axios.interceptors.request.use((config) => {
   const requestUrl = String(config?.url || '');
@@ -99,6 +152,10 @@ axios.interceptors.request.use((config) => {
   } else if (typeof config.withCredentials === 'undefined') {
     // Public market/portfolio compute endpoints should avoid ambient session cookies.
     config.withCredentials = false;
+  }
+
+  if (typeof config.timeout === 'undefined') {
+    config.timeout = isLongRunningRequest(requestUrl) ? LONG_RUNNING_API_TIMEOUT_MS : DEFAULT_API_TIMEOUT_MS;
   }
 
   const method = String(config?.method || 'get').toUpperCase();
@@ -112,10 +169,17 @@ axios.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 errors globally
 axios.interceptors.response.use(
-  response => response,
-  error => {
+  (response) => {
+    emitApiNotice({ clear: true, health: 'healthy' });
+    return response;
+  },
+  (error) => {
+    const notice = buildApiNotice(error);
+    if (notice) {
+      emitApiNotice(notice);
+    }
+
     if (error.response?.status === 401) {
       localStorage.removeItem('authUser');
       if (window.location.pathname !== '/login') {
@@ -128,6 +192,7 @@ axios.interceptors.response.use(
 
 function AppContent() {
   const [apiHealth, setApiHealth] = useState('checking');
+  const [apiNotice, setApiNotice] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [authUser, setAuthUser] = useState(null);
@@ -143,14 +208,52 @@ function AppContent() {
   }, [theme]);
 
   useEffect(() => {
-    // Check API health on load
+    const handleApiNotice = (event) => {
+      const detail = event?.detail || {};
+      if (detail.clear) {
+        setApiNotice(null);
+      } else if (detail.message) {
+        setApiNotice(detail);
+      }
+
+      if (detail.health) {
+        setApiHealth(detail.health);
+      }
+    };
+
+    window.addEventListener(API_NOTICE_EVENT, handleApiNotice);
+    return () => window.removeEventListener(API_NOTICE_EVENT, handleApiNotice);
+  }, []);
+
+  useEffect(() => {
     const healthUrl = API_BASE.replace(/\/api$/, '') + '/health';
-    axios.get(healthUrl, { timeout: 5000 })
-      .then(() => setApiHealth('healthy'))
-      .catch(err => {
+    let cancelled = false;
+
+    const runHealthCheck = async () => {
+      try {
+        await axios.get(healthUrl, { timeout: 5000 });
+        if (!cancelled) {
+          setApiHealth('healthy');
+          setApiNotice(null);
+        }
+      } catch (err) {
         console.warn('API health check failed:', err.message);
-        setApiHealth('error');
-      });
+        if (!cancelled) {
+          setApiHealth((prev) => (prev === 'healthy' ? 'degraded' : 'error'));
+          setApiNotice({
+            level: 'warning',
+            message: 'Some live data features are temporarily delayed. Please wait about 30–90 seconds while the service reconnects, then try again.',
+          });
+        }
+      }
+    };
+
+    runHealthCheck();
+    const intervalId = window.setInterval(runHealthCheck, 45000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   useEffect(() => {
@@ -235,6 +338,13 @@ function AppContent() {
     if (!authUser?.email) return 'U';
     return authUser.email.charAt(0).toUpperCase();
   }, [authUser]);
+
+  const apiStatusLabel = useMemo(() => {
+    if (apiHealth === 'healthy') return lang === 'fr' ? 'En ligne' : 'Online';
+    if (apiHealth === 'degraded') return lang === 'fr' ? 'Occupé' : 'Busy';
+    if (apiHealth === 'error') return lang === 'fr' ? 'Reconnexion…' : 'Reconnecting…';
+    return lang === 'fr' ? 'Vérification…' : 'Checking…';
+  }, [apiHealth, lang]);
 
   if (!authUser && !guestMode) {
     // Allow /login path through so Sign In works
@@ -330,7 +440,7 @@ function AppContent() {
 
         <div className="shell-status-card">
           <span className={`shell-status-dot ${apiHealth}`} />
-          {!sidebarCollapsed && <span>{lang === 'fr' ? 'Système' : 'System'} {apiHealth === 'healthy' ? (lang === 'fr' ? 'En ligne' : 'Online') : apiHealth}</span>}
+          {!sidebarCollapsed && <span>{lang === 'fr' ? 'Système' : 'System'} {apiStatusLabel}</span>}
         </div>
 
         <div className="shell-sidebar-footer">
@@ -402,6 +512,12 @@ function AppContent() {
             </button>
           )}
         </header>
+        {apiNotice?.message && (
+          <div className={`shell-api-banner ${apiNotice.level || 'warning'}`} role="status" aria-live="polite">
+            <strong className="shell-api-banner-title">Live service notice</strong>
+            <span>{apiNotice.message}</span>
+          </div>
+        )}
         <Routes>
           <Route path="/" element={<Dashboard apiBase={API_BASE} />} />
           <Route path="/portfolio" element={<PortfolioGenerator apiBase={API_BASE} />} />

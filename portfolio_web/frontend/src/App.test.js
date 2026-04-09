@@ -38,4 +38,17 @@ describe('App smoke tests', () => {
       expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
     });
   });
+
+  test('shows a friendly service notice when the backend times out', async () => {
+    localStorage.setItem('guestMode', 'true');
+    axios.get.mockReset();
+    axios.get.mockRejectedValueOnce({ code: 'ECONNABORTED', message: 'timeout exceeded' });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Live service notice/i)).toBeInTheDocument();
+      expect(screen.getByText(/Please wait about 30–90 seconds/i)).toBeInTheDocument();
+    });
+  });
 });

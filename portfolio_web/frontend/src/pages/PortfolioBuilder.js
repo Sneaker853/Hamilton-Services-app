@@ -66,6 +66,26 @@ const MetricsPanel = ({ metrics, isBackend, tt }) => (
   </div>
 );
 
+const ANALYTICS_REQUEST_DELAY_MS = 650;
+
+const getFriendlyServiceMessage = (err, fallback) => {
+  const apiMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
+
+  if (err?.code === 'ECONNABORTED' || /timeout/i.test(String(err?.message || ''))) {
+    return 'The analytics service is taking longer than usual. Please wait about 30–90 seconds and try again — your portfolio changes are still safe.';
+  }
+
+  if (!err?.response || err?.message === 'Network Error' || [502, 503, 504].includes(err?.response?.status)) {
+    return 'We’re having trouble reaching the analytics service right now. Please wait about 30–90 seconds while it reconnects, then try again.';
+  }
+
+  if (err?.response?.status === 429) {
+    return 'We’re processing a lot of requests right now. Please wait about a minute and try again.';
+  }
+
+  return apiMessage || fallback;
+};
+
 const PortfolioBuilder = ({ apiBase }) => {
   const { tt } = useLanguage();
   const [allSecurities, setAllSecurities] = useState([]);
@@ -168,11 +188,14 @@ const PortfolioBuilder = ({ apiBase }) => {
         setAllSecurities(Array.from(uniqueByTicker.values()));
         
         if (stocks.length === 0 && etfs.length === 0 && bonds.length === 0) {
-          setError('No securities are currently available. Please try again later.');
+          setError('No securities are currently available. Please try again in a moment.');
         }
       } catch (error) {
         console.error('Error fetching securities:', error);
-        setError('Unable to load securities. Please refresh the page and try again.');
+        setError(getFriendlyServiceMessage(
+          error,
+          'We’re having trouble loading market data right now. Please wait about 30–90 seconds and refresh or try again.'
+        ));
         } finally {
           setLoadingSecurities(false);
       }
@@ -321,14 +344,21 @@ const PortfolioBuilder = ({ apiBase }) => {
       } catch (err) {
         if (!cancelled) {
           setBackendMetrics(null);
+          if (err?.code === 'ECONNABORTED' || !err?.response || (err?.response?.status || 0) >= 500) {
+            setError(getFriendlyServiceMessage(
+              err,
+              'Live portfolio metrics are temporarily delayed. Please wait about 30–90 seconds and try again.'
+            ));
+          }
         }
       }
     };
 
-    fetchCovarianceMetrics();
+    const timerId = setTimeout(fetchCovarianceMetrics, ANALYTICS_REQUEST_DELAY_MS);
 
     return () => {
       cancelled = true;
+      clearTimeout(timerId);
     };
   }, [apiBase, activeHoldingsSignature, draftBaselineMetrics, portfolio]);
 
@@ -378,15 +408,22 @@ const PortfolioBuilder = ({ apiBase }) => {
             setFrontierFallbackReason('insufficient market data');
           } else {
             setFrontierFallbackReason('backend unavailable');
+            if (err?.code === 'ECONNABORTED' || !err?.response || (err?.response?.status || 0) >= 500) {
+              setError(getFriendlyServiceMessage(
+                err,
+                'The efficient frontier is temporarily unavailable. Please wait about 30–90 seconds and try again.'
+              ));
+            }
           }
         }
       }
     };
 
-    fetchEfficientFrontier();
+    const timerId = setTimeout(fetchEfficientFrontier, ANALYTICS_REQUEST_DELAY_MS);
 
     return () => {
       cancelled = true;
+      clearTimeout(timerId);
     };
   }, [apiBase, activeHoldingsSignature, portfolio]);
 
@@ -431,14 +468,21 @@ const PortfolioBuilder = ({ apiBase }) => {
       } catch (err) {
         if (!cancelled) {
           setHistoricalPerformance(null);
+          if (err?.code === 'ECONNABORTED' || !err?.response || (err?.response?.status || 0) >= 500) {
+            setError(getFriendlyServiceMessage(
+              err,
+              'Historical performance data is temporarily delayed. Please wait about 30–90 seconds and try again.'
+            ));
+          }
         }
       }
     };
 
-    fetchHistorical();
+    const timerId = setTimeout(fetchHistorical, ANALYTICS_REQUEST_DELAY_MS);
 
     return () => {
       cancelled = true;
+      clearTimeout(timerId);
     };
   }, [apiBase, activeHoldingsSignature, investmentAmount, portfolio]);
 
@@ -476,8 +520,10 @@ const PortfolioBuilder = ({ apiBase }) => {
     } catch (error) {
       console.error('Error optimizing weights:', error);
       if (autoOptimize) {
-        const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.response?.data?.detail;
-        setError(apiMessage || 'Optimization failed. Showing equal weights.');
+        setError(getFriendlyServiceMessage(
+          error,
+          'Optimization is taking longer than usual, so we’re using equal weights for now. Please wait about 30–90 seconds before trying again.'
+        ));
       }
       // Fallback to equal weights
       const equalWeight = 100 / tickers.length;
@@ -1100,6 +1146,10 @@ const PortfolioBuilder = ({ apiBase }) => {
       }
     } catch (err) {
       console.error(`Analytics error (${tab}):`, err);
+      setError(getFriendlyServiceMessage(
+        err,
+        'Analytics are taking longer than usual right now. Please wait about 30–90 seconds and try again. Your portfolio changes are still safe.'
+      ));
     } finally {
       setAnalyticsLoading(false);
     }

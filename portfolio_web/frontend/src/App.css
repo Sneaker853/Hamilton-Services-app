@@ -193,6 +193,40 @@
   background: #22c55e;
 }
 
+.shell-status-dot.degraded {
+  background: #f59e0b;
+}
+
+.shell-status-dot.error {
+  background: #ef4444;
+}
+
+.shell-api-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fef3c7;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.shell-api-banner.info {
+  border-color: rgba(34, 211, 238, 0.35);
+  background: rgba(6, 182, 212, 0.12);
+  color: #cffafe;
+}
+
+.shell-api-banner-title {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
 .shell-sidebar-footer {
   border-top: 1px solid rgba(100, 116, 139, 0.2);
   padding: 10px;

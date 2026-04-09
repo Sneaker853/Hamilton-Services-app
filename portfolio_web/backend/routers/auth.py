@@ -329,7 +329,7 @@ async def request_password_reset(request: PasswordResetRequest):
         )
 
         if not sent and APP_ENV != "production":
-            logger.info("Password reset debug link for %s: %s/login?reset_token=%s", email, APP_PUBLIC_URL, reset_token)
+            logger.info(f"Password reset debug link for {email}: {APP_PUBLIC_URL}/login?reset_token={reset_token}")
             return {
                 "success": True,
                 "message": "SMTP not configured in development. Check server logs for the reset link.",

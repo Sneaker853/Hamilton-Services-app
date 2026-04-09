@@ -271,7 +271,8 @@ async def request_context_middleware(request: Request, call_next):
             if status_code >= 500:
                 _error_count += 1
 
-        logger.info(
+        log_method = logger.warning if duration_ms >= 5000 else logger.info
+        log_method(
             "%s %s completed with %s in %.2fms",
             request.method,
             request.url.path,

@@ -1,10 +1,13 @@
+from contextlib import contextmanager
 from datetime import datetime
+from functools import wraps
 from typing import List, Dict, Optional
 import logging
 import math
 import json
 import os
 import secrets
+import threading
 
 import numpy as np
 import pandas as pd
@@ -48,10 +51,77 @@ from portfolio_helpers import (
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["portfolio"])
 _persona_cache = TTLCache(ttl_seconds=300)
+_analytics_cache = TTLCache(ttl_seconds=45)
+_analytics_concurrency_limit = max(1, int(os.getenv("PORTFOLIO_ANALYTICS_CONCURRENCY", "2")))
+_analytics_gate = threading.BoundedSemaphore(_analytics_concurrency_limit)
+_ANALYTICS_BUSY_MESSAGE = "The analytics engine is temporarily busy. Please wait about 30–90 seconds and try again."
+
 
 # Helper functions (_load_mean_returns_and_covariance, _get_covariance_method,
 # _normalize_weight_map, _apply_min_active_weight, _fetch_price_matrix,
 # _build_portfolio_returns) are imported from portfolio_helpers.py
+
+
+def _serialize_cache_value(value):
+    if isinstance(value, Request):
+        return None
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json", exclude_none=True)
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_serialize_cache_value(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _serialize_cache_value(val) for key, val in value.items()}
+    return str(value)
+
+
+def _make_analytics_cache_key(prefix: str, args: tuple, kwargs: dict) -> str:
+    payload = {
+        "args": [_serialize_cache_value(arg) for arg in args if not isinstance(arg, Request)],
+        "kwargs": {
+            str(key): _serialize_cache_value(value)
+            for key, value in kwargs.items()
+            if not isinstance(value, Request)
+        },
+    }
+    return f"{prefix}:{json.dumps(payload, sort_keys=True, separators=(',', ':'), default=str)}"
+
+
+@contextmanager
+def _acquire_analytics_slot(name: str):
+    acquired = _analytics_gate.acquire(blocking=False)
+    if not acquired:
+        logger.warning("Analytics concurrency limit reached for %s", name)
+        raise HTTPException(status_code=503, detail=_ANALYTICS_BUSY_MESSAGE)
+    try:
+        yield
+    finally:
+        _analytics_gate.release()
+
+
+def analytics_guarded_endpoint(cache_prefix: str | None = None):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            cache_key = None
+            if cache_prefix:
+                cache_key = _make_analytics_cache_key(cache_prefix, args, kwargs)
+                cached = _analytics_cache.get(cache_key)
+                if cached is not None:
+                    return cached
+
+            with _acquire_analytics_slot(func.__name__):
+                response = func(*args, **kwargs)
+
+            if cache_key is not None and isinstance(response, dict):
+                _analytics_cache.set(cache_key, response)
+
+            return response
+
+        return wrapper
+
+    return decorator
 
 
 @router.post("/api/portfolios/save", response_model=SavedPortfolioResponse)
@@ -79,6 +149,9 @@ async def save_portfolio(
         )
         saved = cur.fetchone()
         conn.commit()
+
+    _analytics_cache.invalidate_prefix("dashboard_performance:")
+    _analytics_cache.invalidate_prefix("portfolio_performance:")
 
     client_ip = req.client.host if req and req.client else None
     write_audit_log("portfolio_save", user_id=user["id"], detail=f"name={request.name.strip()}", ip_address=client_ip)
@@ -365,7 +438,8 @@ async def generate_portfolio(request: PortfolioRequest):
 
 
 @router.post("/api/portfolio/analyze")
-async def analyze_portfolio(request: AnalyzePortfolioRequest):
+@analytics_guarded_endpoint(cache_prefix="analyze_portfolio")
+def analyze_portfolio(request: AnalyzePortfolioRequest):
     try:
         holdings = request.holdings
         if not holdings:
@@ -415,7 +489,8 @@ async def analyze_portfolio(request: AnalyzePortfolioRequest):
 
 
 @router.post("/api/portfolio/optimize-weights")
-async def optimize_weights(request: OptimizeWeightsRequest):
+@analytics_guarded_endpoint(cache_prefix="optimize_weights")
+def optimize_weights(request: OptimizeWeightsRequest):
     try:
         if not request.tickers:
             raise HTTPException(status_code=400, detail="No tickers provided")
@@ -777,7 +852,8 @@ async def optimize_weights(request: OptimizeWeightsRequest):
 
 
 @router.post("/api/portfolio/covariance-metrics")
-async def covariance_metrics(request: CovarianceMetricsRequest):
+@analytics_guarded_endpoint(cache_prefix="covariance_metrics")
+def covariance_metrics(request: CovarianceMetricsRequest):
     try:
         if not request.holdings:
             raise HTTPException(status_code=400, detail="No holdings provided")
@@ -827,7 +903,8 @@ async def covariance_metrics(request: CovarianceMetricsRequest):
 
 
 @router.post("/api/portfolio/efficient-frontier")
-async def efficient_frontier(request: EfficientFrontierRequest):
+@analytics_guarded_endpoint(cache_prefix="efficient_frontier")
+def efficient_frontier(request: EfficientFrontierRequest):
     from scipy.optimize import minimize as scipy_minimize
 
     try:
@@ -942,7 +1019,8 @@ async def efficient_frontier(request: EfficientFrontierRequest):
 
 
 @router.post("/api/portfolio/risk-diagnostics")
-async def risk_diagnostics(request: CovarianceMetricsRequest):
+@analytics_guarded_endpoint(cache_prefix="risk_diagnostics")
+def risk_diagnostics(request: CovarianceMetricsRequest):
     try:
         if not request.holdings:
             raise HTTPException(status_code=400, detail="No holdings provided")
@@ -1040,7 +1118,8 @@ async def risk_diagnostics(request: CovarianceMetricsRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/api/portfolio/historical-performance")
-async def portfolio_historical_performance(req: PortfolioHistoryRequest):
+@analytics_guarded_endpoint(cache_prefix="historical_performance")
+def portfolio_historical_performance(req: PortfolioHistoryRequest):
     """
     Compute a realised historical portfolio value series using actual
     close prices from price_history.  Each holding's weight is treated as
@@ -1137,7 +1216,8 @@ async def portfolio_historical_performance(req: PortfolioHistoryRequest):
 
 
 @router.post("/api/portfolio/benchmark-analytics")
-async def benchmark_analytics(req: BenchmarkAnalyticsRequest):
+@analytics_guarded_endpoint(cache_prefix="benchmark_analytics")
+def benchmark_analytics(req: BenchmarkAnalyticsRequest):
     """
     Compute benchmark-relative statistics: alpha, beta, tracking error,
     information ratio for the portfolio versus a benchmark.
@@ -1221,7 +1301,8 @@ async def benchmark_analytics(req: BenchmarkAnalyticsRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/api/portfolio/backtest")
-async def portfolio_backtest(req: BacktestRequest):
+@analytics_guarded_endpoint(cache_prefix="portfolio_backtest")
+def portfolio_backtest(req: BacktestRequest):
     """
     Walk-forward backtest: simulate portfolio performance with periodic
     rebalancing back to target weights.  Returns daily value series,
@@ -1463,7 +1544,8 @@ _DEFAULT_SCENARIOS = {
 
 
 @router.post("/api/portfolio/stress-test")
-async def stress_test(req: StressTestRequest):
+@analytics_guarded_endpoint(cache_prefix="stress_test")
+def stress_test(req: StressTestRequest):
     """
     Apply predefined shock scenarios to the portfolio.  Returns estimated
     portfolio PnL under each scenario using covariance + factor-based shocks.
@@ -1568,7 +1650,8 @@ async def stress_test(req: StressTestRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/api/portfolio/risk-decomposition")
-async def risk_decomposition(req: RiskDecompositionRequest):
+@analytics_guarded_endpoint(cache_prefix="risk_decomposition")
+def risk_decomposition(req: RiskDecompositionRequest):
     """
     Decompose total portfolio risk into:
     - marginal contribution to risk (MCR) per asset
@@ -1638,7 +1721,8 @@ async def risk_decomposition(req: RiskDecompositionRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/api/portfolio/drift-monitor")
-async def drift_monitor(req: DriftMonitorRequest):
+@analytics_guarded_endpoint(cache_prefix="drift_monitor")
+def drift_monitor(req: DriftMonitorRequest):
     """
     Detect drift of current portfolio weights from target weights.
     If current_values are provided, compute actual weights from market values.
@@ -1792,7 +1876,8 @@ async def drift_monitor(req: DriftMonitorRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/api/portfolio/factor-attribution")
-async def factor_attribution(req: RiskDecompositionRequest):
+@analytics_guarded_endpoint(cache_prefix="factor_attribution")
+def factor_attribution(req: RiskDecompositionRequest):
     """
     Aggregate individual stock FF5 betas into portfolio-level factor
     exposures.  Returns weighted beta to each Fama-French factor,
@@ -1871,7 +1956,8 @@ async def factor_attribution(req: RiskDecompositionRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/api/portfolio/var-cvar")
-async def var_cvar(req: CovarianceMetricsRequest):
+@analytics_guarded_endpoint(cache_prefix="var_cvar")
+def var_cvar(req: CovarianceMetricsRequest):
     """
     Compute parametric and historical VaR / CVaR (Expected Shortfall)
     at 95% and 99% confidence levels.
@@ -1959,7 +2045,8 @@ async def var_cvar(req: CovarianceMetricsRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/api/portfolio/style-analysis")
-async def style_analysis(req: RiskDecompositionRequest):
+@analytics_guarded_endpoint(cache_prefix="style_analysis")
+def style_analysis(req: RiskDecompositionRequest):
     """
     Sharpe returns-based style analysis.  Regresses portfolio returns
     against size (SMB) and value (HML) FF5 factor betas to classify
@@ -2061,7 +2148,8 @@ async def style_analysis(req: RiskDecompositionRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/api/portfolio/brinson-attribution")
-async def brinson_attribution(req: BenchmarkAnalyticsRequest):
+@analytics_guarded_endpoint(cache_prefix="brinson_attribution")
+def brinson_attribution(req: BenchmarkAnalyticsRequest):
     """
     Brinson-Fachler performance attribution: decomposes active return into
     allocation effect, selection effect, and interaction effect by sector.
@@ -2227,7 +2315,8 @@ async def brinson_attribution(req: BenchmarkAnalyticsRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/api/portfolio/smart-rebalance-calendar")
-async def smart_rebalance_calendar(req: DriftMonitorRequest):
+@analytics_guarded_endpoint(cache_prefix="smart_rebalance_calendar")
+def smart_rebalance_calendar(req: DriftMonitorRequest):
     """
     Generate a smart rebalancing calendar for the next 90 days.
     Avoids rebalancing near estimated ex-dividend dates (±2 business days)
@@ -2370,7 +2459,8 @@ async def smart_rebalance_calendar(req: DriftMonitorRequest):
 # ---------------------------------------------------------------------------
 
 @router.get("/api/portfolio-performance/{portfolio_id}")
-async def get_portfolio_performance(
+@analytics_guarded_endpoint(cache_prefix="portfolio_performance")
+def get_portfolio_performance(
     portfolio_id: int,
     x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
     session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
@@ -2511,7 +2601,8 @@ async def get_portfolio_performance(
 # ---------------------------------------------------------------------------
 
 @router.get("/api/dashboard-performance")
-async def get_dashboard_performance(
+@analytics_guarded_endpoint(cache_prefix="dashboard_performance")
+def get_dashboard_performance(
     months: int = Query(6, ge=1, le=12),
     x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token"),
     session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),

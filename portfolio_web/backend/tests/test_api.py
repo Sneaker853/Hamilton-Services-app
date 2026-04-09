@@ -133,6 +133,37 @@ def test_generate_portfolio_endpoint(client, monkeypatch):
     assert len(data["holdings"]) == 2
 
 
+def test_covariance_metrics_requests_are_cached(client, monkeypatch):
+    calls = {"count": 0}
+
+    def fake_load_mean_returns_and_covariance(tickers):
+        calls["count"] += 1
+        return ["AAPL", "MSFT"], portfolio_router.np.array([0.10, 0.08]), portfolio_router.np.array([
+            [0.040, 0.010],
+            [0.010, 0.030],
+        ])
+
+    monkeypatch.setattr(
+        portfolio_router,
+        "_load_mean_returns_and_covariance",
+        fake_load_mean_returns_and_covariance,
+    )
+
+    payload = {
+        "holdings": [
+            {"ticker": "AAPL", "weight": 60},
+            {"ticker": "MSFT", "weight": 40},
+        ]
+    }
+
+    first = client.post("/api/portfolio/covariance-metrics", json=payload)
+    second = client.post("/api/portfolio/covariance-metrics", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert calls["count"] == 1
+
+
 def test_admin_endpoints_require_auth(client):
     response = client.get("/api/admin/update-status")
     assert response.status_code == 401
