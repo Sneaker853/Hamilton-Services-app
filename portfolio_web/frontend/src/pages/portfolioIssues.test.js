@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import axios from 'axios';
 import Goals from './Goals';
 import PortfolioComparison from './PortfolioComparison';
+import StockComparison from './StockComparison';
 import { LanguageProvider } from '../components';
 
 jest.mock('axios', () => ({
@@ -116,6 +117,109 @@ describe('portfolio issue regressions', () => {
       expect(screen.getByText('Current Value')).toBeInTheDocument();
       expect(screen.getByText('$12,500')).toBeInTheDocument();
       expect(screen.getByText('$7,600')).toBeInTheDocument();
+    });
+  });
+
+  test('stock comparison formats decimal-based financial ratios as readable percentages', async () => {
+    axios.get.mockImplementation((url, config) => {
+      if (url.includes('/stocks/search')) {
+        return Promise.resolve({
+          data: { results: [{ ticker: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Technology' }] },
+        });
+      }
+      if (url.includes('/stocks/AAPL')) {
+        return Promise.resolve({
+          data: {
+            ticker: 'AAPL',
+            name: 'Apple Inc.',
+            exchange: 'NASDAQ',
+            sector: 'Technology',
+            current_price: 190.25,
+            market_cap: 2800000000000,
+            pe_ratio: 31.2,
+            roe: 0.215,
+            beta: 1.12,
+            dividend_yield: 0.0048,
+            expected_return: 0.126,
+            volatility: 0.238,
+          },
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
+
+    renderWithLanguage(<StockComparison apiBase="http://localhost:8000/api" />);
+
+    fireEvent.change(screen.getByPlaceholderText(/search by ticker or company name/i), {
+      target: { value: 'AAP' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /aapl/i }));
+
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/stocks/MSFT')) {
+        return Promise.resolve({
+          data: {
+            ticker: 'MSFT',
+            name: 'Microsoft',
+            exchange: 'NASDAQ',
+            sector: 'Technology',
+            current_price: 420.1,
+            market_cap: 3100000000000,
+            pe_ratio: 34.1,
+            roe: 0.31,
+            beta: 0.98,
+            dividend_yield: 0.0072,
+            expected_return: 0.101,
+            volatility: 0.201,
+          },
+        });
+      }
+      if (url.includes('/stocks/search')) {
+        return Promise.resolve({
+          data: { results: [{ ticker: 'MSFT', name: 'Microsoft', exchange: 'NASDAQ', sector: 'Technology' }] },
+        });
+      }
+      if (url.includes('/stocks/AAPL')) {
+        return Promise.resolve({
+          data: {
+            ticker: 'AAPL',
+            name: 'Apple Inc.',
+            exchange: 'NASDAQ',
+            sector: 'Technology',
+            current_price: 190.25,
+            market_cap: 2800000000000,
+            pe_ratio: 31.2,
+            roe: 0.215,
+            beta: 1.12,
+            dividend_yield: 0.0048,
+            expected_return: 0.126,
+            volatility: 0.238,
+          },
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
+
+    fireEvent.change(screen.getByPlaceholderText(/search by ticker or company name/i), {
+      target: { value: 'MSF' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Microsoft')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /msft/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('+21.50%')).toBeInTheDocument();
+      expect(screen.getByText('+0.48%')).toBeInTheDocument();
+      expect(screen.getByText('+12.6%')).toBeInTheDocument();
+      expect(screen.getByText('+23.8%')).toBeInTheDocument();
     });
   });
 });

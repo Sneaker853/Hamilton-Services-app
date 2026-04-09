@@ -23,18 +23,19 @@
 
 .stock-search-input {
   width: 100%;
-  padding: 0.65rem 0.75rem 0.65rem 2.4rem;
-  border: 1px solid var(--border-color, #d1d5db);
-  border-radius: 8px;
+  padding: 0.7rem 0.75rem 0.7rem 2.4rem;
+  border: 1px solid rgba(100, 116, 139, 0.28);
+  border-radius: 10px;
   font-size: 0.95rem;
-  background: var(--bg-secondary, #fff);
-  color: var(--text-primary, #1a1a2e);
+  background: rgba(15, 23, 42, 0.5);
+  color: #e2e8f0;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .stock-search-input:focus {
-  border-color: var(--accent-color, #6366f1);
+  border-color: rgba(34, 211, 238, 0.5);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.2);
 }
 
 .stock-search-spinner {
@@ -58,9 +59,9 @@
   top: 100%;
   left: 0;
   right: 0;
-  background: var(--bg-secondary, #fff);
-  border: 1px solid var(--border-color, #d1d5db);
-  border-radius: 8px;
+  background: rgba(13, 19, 33, 0.97);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  border-radius: 10px;
   margin-top: 4px;
   list-style: none;
   padding: 0;
@@ -80,22 +81,22 @@
   background: none;
   cursor: pointer;
   font-size: 0.9rem;
-  color: var(--text-primary, #1a1a2e);
+  color: #e2e8f0;
   text-align: left;
 }
 
 .stock-search-suggestions li button:hover {
-  background: var(--bg-hover, #f1f5f9);
+  background: rgba(34, 211, 238, 0.08);
 }
 
 .stock-search-suggestions li button strong {
   min-width: 60px;
-  color: var(--accent-color, #6366f1);
+  color: #22d3ee;
 }
 
 .stock-search-suggestions li button small {
   margin-left: auto;
-  color: var(--text-secondary, #888);
+  color: #94a3b8;
   font-size: 0.8rem;
 }
 
@@ -112,8 +113,9 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.35rem 0.7rem;
-  background: var(--accent-color, #6366f1);
-  color: #fff;
+  background: rgba(34, 211, 238, 0.18);
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  color: #67e8f9;
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 600;
@@ -124,7 +126,7 @@
   align-items: center;
   border: none;
   background: none;
-  color: #fff;
+  color: #67e8f9;
   cursor: pointer;
   padding: 0;
   opacity: 0.8;
@@ -139,7 +141,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  color: var(--danger-color, #ef4444);
+  color: #ef5350;
   font-weight: 500;
   font-size: 0.85rem;
 }
@@ -148,7 +150,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  color: var(--success-color, #22c55e);
+  color: #22c55e;
   font-weight: 500;
   font-size: 0.85rem;
 }

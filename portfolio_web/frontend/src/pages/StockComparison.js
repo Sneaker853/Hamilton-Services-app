@@ -10,6 +10,12 @@ const asNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const normalizePercentLike = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.abs(numeric) <= 1.5 ? numeric * 100 : numeric;
+};
+
 const formatPct = (value, digits = 2) => {
   const num = asNumber(value);
   const sign = num > 0 ? '+' : '';
@@ -19,6 +25,12 @@ const formatPct = (value, digits = 2) => {
 const formatCurrency = (value) =>
   asNumber(value).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 
+const formatPercentMetric = (value, digits = 2) => {
+  const normalized = normalizePercentLike(value);
+  if (normalized == null) return '—';
+  return formatPct(normalized, digits);
+};
+
 const formatLargeNumber = (value) => {
   const num = asNumber(value);
   if (num >= 1e12) return `$${(num / 1e12).toFixed(2)}T`;
@@ -27,22 +39,23 @@ const formatLargeNumber = (value) => {
   return formatCurrency(num);
 };
 
-const METRIC_ROWS = [
-  { key: 'name', label: 'Company', format: (v) => v || '—' },
-  { key: 'exchange', label: 'Exchange', format: (v) => v || '—' },
-  { key: 'sector', label: 'Sector', format: (v) => v || '—' },
-  { key: 'current_price', label: 'Price', format: formatCurrency },
-  { key: 'market_cap', label: 'Market Cap', format: formatLargeNumber, help: 'Total market capitalization (share price × shares outstanding).' },
-  { key: 'pe_ratio', label: 'P/E Ratio', format: (v) => asNumber(v) ? asNumber(v).toFixed(2) : '—', help: 'Price-to-earnings ratio. Lower may indicate better value.' },
-  { key: 'roe', label: 'ROE', format: (v) => asNumber(v) ? formatPct(asNumber(v)) : '—', help: 'Return on equity — measures profitability relative to shareholder equity.' },
-  { key: 'beta', label: 'Beta', format: (v) => asNumber(v) ? asNumber(v).toFixed(2) : '—', help: 'Market sensitivity. β > 1 = more volatile than market.' },
-  { key: 'dividend_yield', label: 'Dividend Yield', format: (v) => asNumber(v) ? formatPct(asNumber(v)) : '—', help: 'Annual dividend as a percentage of share price.' },
-  { key: 'expected_return', label: 'Expected Return', format: (v) => formatPct(asNumber(v) * 100, 1), help: 'Annualized expected return from the FF5 factor model.' },
-  { key: 'volatility', label: 'Volatility', format: (v) => formatPct(asNumber(v) * 100, 1), help: 'Annualized standard deviation of returns.' },
+const buildMetricRows = (tt) => [
+  { key: 'name', label: tt('Company'), format: (v) => v || '—' },
+  { key: 'exchange', label: tt('Exchange'), format: (v) => v || '—' },
+  { key: 'sector', label: tt('Sector'), format: (v) => v || '—' },
+  { key: 'current_price', label: tt('Price'), format: formatCurrency },
+  { key: 'market_cap', label: tt('Market Cap'), format: formatLargeNumber, help: tt('Total market capitalization (share price × shares outstanding).') },
+  { key: 'pe_ratio', label: tt('P/E Ratio'), format: (v) => asNumber(v) ? asNumber(v).toFixed(2) : '—', help: tt('Price-to-earnings ratio. Lower may indicate better value.') },
+  { key: 'roe', label: tt('ROE'), format: (v) => formatPercentMetric(v), help: tt('Return on equity — measures profitability relative to shareholder equity.') },
+  { key: 'beta', label: tt('Beta'), format: (v) => asNumber(v) ? asNumber(v).toFixed(2) : '—', help: tt('Market sensitivity. β > 1 = more volatile than market.') },
+  { key: 'dividend_yield', label: tt('Dividend Yield'), format: (v) => formatPercentMetric(v), help: tt('Annual dividend as a percentage of share price.') },
+  { key: 'expected_return', label: tt('Expected Return'), format: (v) => formatPercentMetric(v, 1), help: tt('Annualized expected return from the FF5 factor model.') },
+  { key: 'volatility', label: tt('Volatility'), format: (v) => formatPercentMetric(v, 1), help: tt('Annualized standard deviation of returns.') },
 ];
 
 const StockComparison = ({ apiBase }) => {
   const { tt } = useLanguage();
+  const metricRows = buildMetricRows(tt);
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [selectedStocks, setSelectedStocks] = useState([]);
@@ -111,7 +124,7 @@ const StockComparison = ({ apiBase }) => {
   const handleExport = () => {
     if (comparedStocks.length === 0) return;
     const headers = ['Metric', ...comparedStocks.map((s) => s.ticker)];
-    const rows = METRIC_ROWS.map((row) => [
+    const rows = metricRows.map((row) => [
       row.label,
       ...comparedStocks.map((s) => String(row.format(s[row.key]))),
     ]);
@@ -121,7 +134,7 @@ const StockComparison = ({ apiBase }) => {
   return (
     <div className="page-container stock-comparison-root">
       <div className="page-header">
-        <h1>Stock Comparison</h1>
+        <h1>{tt('Stock Comparison')}</h1>
         <p className="page-subtitle">
           {tt('Compare fundamentals and metrics for up to 6 stocks side-by-side')}
         </p>
@@ -194,7 +207,7 @@ const StockComparison = ({ apiBase }) => {
                 </tr>
               </thead>
               <tbody>
-                {METRIC_ROWS.map((row) => {
+                {metricRows.map((row) => {
                   const bestIdx =
                     row.key === 'pe_ratio' ? bestForMetric(row.key, false)
                     : ['expected_return', 'roe', 'dividend_yield', 'market_cap'].includes(row.key)
