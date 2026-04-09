@@ -77,8 +77,10 @@
 .watchlist-root .wl-search-results {
   margin-top: 8px;
   border: 1px solid rgba(100, 116, 139, 0.2);
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(8px);
 }
 
 .watchlist-root .wl-search-item {
@@ -91,6 +93,10 @@
 
 .watchlist-root .wl-search-item:last-child {
   border-bottom: none;
+}
+
+.watchlist-root .wl-search-item:hover {
+  background: rgba(34, 211, 238, 0.06);
 }
 
 .watchlist-root .wl-search-ticker {
@@ -163,6 +169,10 @@
   padding: 10px;
   border-bottom: 1px solid rgba(100, 116, 139, 0.08);
   color: #cbd5e1;
+}
+
+.watchlist-root .wl-table tbody tr:hover td {
+  background: rgba(34, 211, 238, 0.04);
 }
 
 .watchlist-root .wl-ticker {

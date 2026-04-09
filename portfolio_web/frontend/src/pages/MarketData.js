@@ -39,7 +39,7 @@ const MarketData = ({ apiBase }) => {
       console.error('Error fetching stocks:', fetchError);
       setError(tt('Unable to load market data. Please try again.'));
     }
-  }, [apiBase]);
+  }, [apiBase, tt]);
 
   const fetchFilterOptions = useCallback(async () => {
     try {
@@ -63,7 +63,7 @@ const MarketData = ({ apiBase }) => {
     } finally {
       setLoading(false);
     }
-  }, [apiBase]);
+  }, [apiBase, tt]);
 
   const fetchPriceHistory = useCallback(async (ticker, period) => {
     setLoading(true);
@@ -76,7 +76,7 @@ const MarketData = ({ apiBase }) => {
     } finally {
       setLoading(false);
     }
-  }, [apiBase]);
+  }, [apiBase, tt]);
 
   useEffect(() => {
     fetchAllStocks();

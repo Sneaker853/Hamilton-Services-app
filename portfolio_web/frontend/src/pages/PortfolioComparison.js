@@ -19,7 +19,7 @@ const formatPct = (value, digits = 2) => {
 const formatCurrency = (value) =>
   asNumber(value).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
-const extractMetrics = (portfolio) => {
+const extractMetrics = (portfolio, performance = null) => {
   const data = portfolio?.data || {};
   const summary = data.summary || {};
   const metrics = data.metrics || {};
@@ -29,8 +29,22 @@ const extractMetrics = (portfolio) => {
   const expectedReturn = asNumber(summary.expected_return ?? metrics.expected_return);
   const volatility = asNumber(summary.volatility ?? metrics.volatility);
   const sharpe = asNumber(metrics.sharpe_ratio ?? summary.sharpe_ratio);
+  const holdingsCurrentValue = holdings.reduce((sum, holding) => {
+    const holdingValue = asNumber(holding?.value);
+    if (holdingValue > 0) return sum + holdingValue;
+    return sum + (investment * asNumber(holding?.weight)) / 100;
+  }, 0);
+  const currentValue = asNumber(
+    performance?.current_actual_value,
+    holdingsCurrentValue > 0 ? holdingsCurrentValue : investment,
+  );
+  const gainLossPct = performance?.total_return_pct != null
+    ? asNumber(performance.total_return_pct)
+    : (investment > 0 ? ((currentValue - investment) / investment) * 100 : 0);
+  const modelReturnPct = performance?.projected_return_pct != null
+    ? asNumber(performance.projected_return_pct)
+    : (Math.abs(expectedReturn) > 1.5 ? expectedReturn : expectedReturn * 100);
 
-  // Sectors
   const sectorMap = {};
   holdings.forEach((h) => {
     const sector = h.sector || 'Unknown';
@@ -40,13 +54,9 @@ const extractMetrics = (portfolio) => {
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5);
 
-  // Top holdings
   const topHoldings = [...holdings]
     .sort((a, b) => asNumber(b.weight) - asNumber(a.weight))
     .slice(0, 5);
-
-  const estimatedCurrentValue = investment * (1 + expectedReturn / 100);
-  const gainLossPct = expectedReturn; // already in % per year
 
   return {
     name: portfolio.name || 'Unnamed',
@@ -54,8 +64,9 @@ const extractMetrics = (portfolio) => {
     createdAt: portfolio.created_at,
     holdingsCount: holdings.length,
     investment,
-    estimatedCurrentValue,
+    currentValue,
     gainLossPct,
+    modelReturnPct,
     expectedReturn: Math.abs(expectedReturn) > 1.5 ? expectedReturn : expectedReturn * 100,
     volatility: Math.abs(volatility) > 1.5 ? volatility : volatility * 100,
     sharpe,
@@ -68,8 +79,9 @@ const METRIC_ROWS = [
   { key: 'createdAt', label: 'Date Created', format: (v) => v ? new Date(v).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A' },
   { key: 'holdingsCount', label: 'Holdings', format: (v) => v },
   { key: 'investment', label: 'Investment', format: formatCurrency },
-  { key: 'estimatedCurrentValue', label: 'Est. Current Value', format: formatCurrency, help: 'Investment amount plus one year of model-projected return.' },
-  { key: 'gainLossPct', label: 'Projected Gain/Loss', format: (v) => formatPct(v, 1), help: 'Expected annual gain or loss as a percentage of the original investment.' },
+  { key: 'currentValue', label: 'Current Value', format: formatCurrency, help: 'Latest actual value based on tracked portfolio performance and market prices.' },
+  { key: 'gainLossPct', label: 'Current Gain/Loss', format: (v) => formatPct(v, 1), help: 'Actual gain or loss since the portfolio was created.' },
+  { key: 'modelReturnPct', label: 'Model Estimate', format: (v) => formatPct(v, 1), help: 'Model-projected return over the same period using factor-based expected returns.' },
   { key: 'expectedReturn', label: 'Expected Return', format: (v) => formatPct(v), help: 'Annualized expected return from the FF5 factor model.' },
   { key: 'volatility', label: 'Volatility', format: (v) => formatPct(v, 1), help: 'Annualized standard deviation of portfolio returns.' },
   { key: 'sharpe', label: 'Sharpe Ratio', format: (v) => v.toFixed(2), help: 'Risk-adjusted return: (Return − Rf) ÷ Volatility.' },
@@ -81,6 +93,7 @@ const PortfolioComparison = ({ apiBase }) => {
   const [portfolios, setPortfolios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState([]);
+  const [performanceById, setPerformanceById] = useState({});
 
   useEffect(() => {
     const fetchPortfolios = async () => {
@@ -101,6 +114,35 @@ const PortfolioComparison = ({ apiBase }) => {
     fetchPortfolios();
   }, [apiBase]);
 
+  useEffect(() => {
+    if (selected.length === 0) return;
+
+    let cancelled = false;
+    const fetchPerformance = async () => {
+      const responses = await Promise.all(selected.map(async (id) => {
+        try {
+          const response = await axios.get(`${apiBase}/portfolio-performance/${id}`, { withCredentials: true });
+          return [id, response.data];
+        } catch {
+          return [id, null];
+        }
+      }));
+
+      if (!cancelled) {
+        setPerformanceById((prev) => {
+          const next = { ...prev };
+          responses.forEach(([id, data]) => {
+            if (data) next[id] = data;
+          });
+          return next;
+        });
+      }
+    };
+
+    fetchPerformance();
+    return () => { cancelled = true; };
+  }, [apiBase, selected]);
+
   const toggleSelect = (id) => {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
@@ -108,8 +150,8 @@ const PortfolioComparison = ({ apiBase }) => {
   };
 
   const comparedPortfolios = useMemo(
-    () => portfolios.filter((p) => selected.includes(p.id)).map(extractMetrics),
-    [portfolios, selected]
+    () => portfolios.filter((p) => selected.includes(p.id)).map((portfolio) => extractMetrics(portfolio, performanceById[portfolio.id])),
+    [performanceById, portfolios, selected]
   );
 
   const handleExportComparison = () => {
@@ -199,7 +241,7 @@ const PortfolioComparison = ({ apiBase }) => {
               </thead>
               <tbody>
                 {METRIC_ROWS.map((row) => {
-                  const bestIdx = ['expectedReturn', 'sharpe'].includes(row.key)
+                  const bestIdx = ['gainLossPct', 'modelReturnPct', 'expectedReturn', 'sharpe'].includes(row.key)
                     ? bestForMetric(row.key, true)
                     : row.key === 'volatility'
                     ? bestForMetric(row.key, false)

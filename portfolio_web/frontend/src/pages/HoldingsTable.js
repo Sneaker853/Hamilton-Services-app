@@ -45,7 +45,6 @@ const estimateConfidenceScore = (holding) => {
   return components.reduce((sum, value) => sum + value, 0) / components.length;
 };
 
-/* Confidence badge: maps score (0–1) to color + label */
 const formatEstimatorLabel = (estimator) => {
   const raw = String(estimator || '').trim();
   if (!raw) return 'Heuristic';
@@ -60,7 +59,9 @@ const ConfidenceBadge = ({ holding }) => {
   const { tt } = useLanguage();
   const score = estimateConfidenceScore(holding);
   const estimatorLabel = formatEstimatorLabel(holding?.return_estimator);
-  if (score == null) return <span className="pb-confidence-badge none" title={`${tt('No confidence data')}\n${tt('Estimator')}: ${estimatorLabel}`}>—</span>;
+  if (score == null) {
+    return <span className="pb-confidence-badge none" title={`${tt('No confidence data')}\n${tt('Estimator')}: ${estimatorLabel}`}>—</span>;
+  }
   const pct = Math.round(score * 100);
   let level = 'low';
   if (pct >= 70) level = 'high';
@@ -77,91 +78,95 @@ const ConfidenceBadge = ({ holding }) => {
 
 const HoldingsTable = ({ holdings, onWeightChange, onRemove, onDragStart, onDrop, onDragEnd, onMoveUp, onMoveDown }) => {
   const { tt } = useLanguage();
+
   return (
-  <div className="holdings-table-wrapper">
-    <h3 className="pb-sub-title">{tt('Holdings')} ({holdings.length})</h3>
-    <div className="holdings-table pb-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>{tt('Ticker')}</th>
-            <th>{tt('Sector')}</th>
-            <th>{tt('Weight (%)')}</th>
-            <th>{tt('Confidence')}</th>
-            <th>{tt('Value')}</th>
-            <th>{tt('Shares')}</th>
-            <th className="pb-center-cell">{tt('Reorder')}</th>
-            <th className="pb-center-cell">{tt('Action')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {holdings.map((holding, idx) => {
-            const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-            return (
-            <tr
-              key={idx}
-              draggable={!isTouchDevice}
-              aria-label={`${tt('Holding row')} ${holding.ticker}`}
-              onDragStart={isTouchDevice ? undefined : () => onDragStart(holding.ticker)}
-              onDragOver={isTouchDevice ? undefined : (event) => event.preventDefault()}
-              onDrop={isTouchDevice ? undefined : () => onDrop(holding.ticker)}
-              onDragEnd={isTouchDevice ? undefined : onDragEnd}
-              className="pb-draggable-row"
-            >
-              <td className="ticker">{holding.ticker}</td>
-              <td className="pb-sector-cell">{holding.sector || 'N/A'}</td>
-              <td>
-              <td className="pb-sector-cell">{holding.sector || tt('N/A')}</td>
-                  type="number"
-                  value={holding.weight}
-                  onChange={(e) => onWeightChange(holding.ticker, e.target.value)}
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  className="pb-weight-input"
-                />
-              </td>
-              <td><ConfidenceBadge holding={holding} /></td>
-              <td>${holding.value?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}</td>
-              <td>{holding.shares?.toFixed(2) || '0'}</td>
-              <td className="pb-center-cell">
-                <div className="pb-row-reorder-actions">
-                  <button
-                    type="button"
-                    onClick={() => onMoveUp(holding.ticker)}
-                    className="pb-reorder-btn"
-                    aria-label={`${tt('Move')} ${holding.ticker} ${tt('up')}`}
-                    disabled={idx === 0}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onMoveDown(holding.ticker)}
-                    className="pb-reorder-btn"
-                    aria-label={`${tt('Move')} ${holding.ticker} ${tt('down')}`}
-                    disabled={idx === holdings.length - 1}
-                  >
-                    ↓
-                  </button>
-                </div>
-              </td>
-              <td className="pb-center-cell">
-                <button
-                  onClick={() => onRemove(holding.ticker)}
-                  aria-label={`${tt('Remove')} ${holding.ticker}`}
-                  className="pb-remove-btn"
-                >
-                  <FiX />
-                </button>
-              </td>
+    <div className="holdings-table-wrapper">
+      <h3 className="pb-sub-title">{tt('Holdings')} ({holdings.length})</h3>
+      <p className="pb-holdings-note">{tt('Confidence scores summarize how stable each holding’s return and risk inputs are. Hover a badge for details.')}</p>
+      <div className="holdings-table pb-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>{tt('Ticker')}</th>
+              <th>{tt('Sector')}</th>
+              <th>{tt('Weight (%)')}</th>
+              <th>{tt('Confidence')}</th>
+              <th>{tt('Value')}</th>
+              <th>{tt('Shares')}</th>
+              <th className="pb-center-cell">{tt('Reorder')}</th>
+              <th className="pb-center-cell">{tt('Action')}</th>
             </tr>
-            );
-          })}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {holdings.map((holding, idx) => {
+              const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+              return (
+                <tr
+                  key={holding.ticker || idx}
+                  draggable={!isTouchDevice}
+                  aria-label={`${tt('Holding row')} ${holding.ticker}`}
+                  onDragStart={isTouchDevice ? undefined : () => onDragStart(holding.ticker)}
+                  onDragOver={isTouchDevice ? undefined : (event) => event.preventDefault()}
+                  onDrop={isTouchDevice ? undefined : () => onDrop(holding.ticker)}
+                  onDragEnd={isTouchDevice ? undefined : onDragEnd}
+                  className="pb-draggable-row"
+                >
+                  <td className="ticker">{holding.ticker}</td>
+                  <td className="pb-sector-cell">{holding.sector || tt('N/A')}</td>
+                  <td>
+                    <input
+                      type="number"
+                      value={holding.weight}
+                      onChange={(e) => onWeightChange(holding.ticker, e.target.value)}
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      className="pb-weight-input"
+                      aria-label={`${holding.ticker} ${tt('Weight (%)')}`}
+                    />
+                  </td>
+                  <td><ConfidenceBadge holding={holding} /></td>
+                  <td>${Number(holding.value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                  <td>{Number(holding.shares || 0).toFixed(2)}</td>
+                  <td className="pb-center-cell">
+                    <div className="pb-row-reorder-actions">
+                      <button
+                        type="button"
+                        onClick={() => onMoveUp(holding.ticker)}
+                        className="pb-reorder-btn"
+                        aria-label={`${tt('Move')} ${holding.ticker} ${tt('up')}`}
+                        disabled={idx === 0}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onMoveDown(holding.ticker)}
+                        className="pb-reorder-btn"
+                        aria-label={`${tt('Move')} ${holding.ticker} ${tt('down')}`}
+                        disabled={idx === holdings.length - 1}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  </td>
+                  <td className="pb-center-cell">
+                    <button
+                      type="button"
+                      onClick={() => onRemove(holding.ticker)}
+                      aria-label={`${tt('Remove')} ${holding.ticker}`}
+                      className="pb-remove-btn"
+                    >
+                      <FiX />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
   );
 };
 

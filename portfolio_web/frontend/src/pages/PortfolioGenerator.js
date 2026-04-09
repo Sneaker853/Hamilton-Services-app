@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { FiTrendingUp, FiDollarSign, FiLayers, FiPieChart, FiBarChart2, FiSettings, FiDownload } from 'react-icons/fi';
 import { Button, Card, CardHeader, CardBody, LoadingSkeleton, CardSkeleton, HelpIcon, useLanguage } from '../components';
 import ProgressBar from '../components/ProgressBar';
@@ -30,6 +30,17 @@ const PERSONA_SECTOR_MAX = {
   conservative: 20,
 };
 
+const PERSONA_ASSET_DEFAULTS = {
+  growth_seeker: { include_etfs: true, include_bonds: false },
+  aggressive: { include_etfs: true, include_bonds: false },
+  moderate_aggressive: { include_etfs: true, include_bonds: false },
+  eco_friendly: { include_etfs: true, include_bonds: true },
+  income_focus: { include_etfs: true, include_bonds: true },
+  balanced: { include_etfs: true, include_bonds: true },
+  moderate_conservative: { include_etfs: true, include_bonds: true },
+  conservative: { include_etfs: true, include_bonds: true },
+};
+
 const PortfolioGenerator = ({ apiBase }) => {
   const { tt } = useLanguage();
   const [personas, setPersonas] = useState([]);
@@ -54,12 +65,6 @@ const PortfolioGenerator = ({ apiBase }) => {
 
   const COLORS = ['#22d3ee', '#818cf8', '#f472b6', '#34d399', '#fb923c', '#a78bfa', '#38bdf8', '#fbbf24', '#f87171', '#4ade80'];
 
-  const pieLegendStyle = {
-    fontSize: '11px',
-    color: '#94a3b8',
-    paddingTop: '8px',
-    lineHeight: '20px',
-  };
 
   const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     if (percent < 0.05) return null;
@@ -156,14 +161,19 @@ const PortfolioGenerator = ({ apiBase }) => {
     };
 
     fetchPersonas();
-  }, [apiBase]);
+  }, [apiBase, tt]);
 
-  // Auto-update max_sector_pct when persona changes
+  // Auto-update constraints and default ETF/bond preferences when persona changes
   useEffect(() => {
     const sectorMax = PERSONA_SECTOR_MAX[formData.persona_name];
-    if (sectorMax !== undefined) {
-      setFormData(prev => ({ ...prev, max_sector_pct: sectorMax }));
-    }
+    const assetDefaults = PERSONA_ASSET_DEFAULTS[formData.persona_name];
+
+    setFormData(prev => ({
+      ...prev,
+      max_sector_pct: sectorMax !== undefined ? sectorMax : prev.max_sector_pct,
+      include_etfs: assetDefaults?.include_etfs ?? prev.include_etfs,
+      include_bonds: assetDefaults?.include_bonds ?? prev.include_bonds,
+    }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.persona_name]);
 
@@ -350,6 +360,7 @@ const PortfolioGenerator = ({ apiBase }) => {
                 {PERSONA_DESCRIPTIONS[formData.persona_name] && (
                   <p className="pg-persona-desc">{PERSONA_DESCRIPTIONS[formData.persona_name]}</p>
                 )}
+                <p className="pg-auto-selection-note">{tt('ETF and bond options are preselected for this profile, but you can still change them below.')}</p>
                 </>
               )}
             </div>

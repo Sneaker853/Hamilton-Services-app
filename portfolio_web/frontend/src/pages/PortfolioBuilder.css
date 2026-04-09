@@ -183,6 +183,13 @@
   font-size: 14px;
 }
 
+.portfolio-builder-root .pb-holdings-note {
+  margin: 6px 0 12px;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .portfolio-builder-root .pb-search-title {
   margin: 20px 0 8px;
 }

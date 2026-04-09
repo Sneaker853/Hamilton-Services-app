@@ -57,17 +57,50 @@
 .goals-form input, .goals-form select {
   background: rgba(10, 14, 26, 0.7);
   border: 1px solid rgba(100, 116, 139, 0.3);
-  border-radius: 6px;
+  border-radius: 10px;
   color: #e2e8f0;
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-size: 0.9rem;
   flex: 1;
   min-width: 80px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.goals-form input:focus, .goals-form select:focus {
+  outline: none;
+  border-color: rgba(34, 211, 238, 0.5);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.2);
+}
+.goals-form select {
+  appearance: none;
+  padding-right: 38px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #22d3ee 50%),
+    linear-gradient(135deg, #22d3ee 50%, transparent 50%),
+    linear-gradient(to right, rgba(100, 116, 139, 0.18), rgba(100, 116, 139, 0.18));
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 12px) calc(50% - 3px),
+    calc(100% - 2.2rem) 50%;
+  background-size: 6px 6px, 6px 6px, 1px 60%;
+  background-repeat: no-repeat;
 }
 .goals-alloc-label {
   color: #94a3b8;
   font-size: 0.82rem;
   margin-bottom: 8px;
+}
+.goals-form-note {
+  margin: -2px 0 10px;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.goals-form-note.small {
+  margin-top: -2px;
+  color: #7dd3fc;
+}
+.goals-linked-select {
+  min-width: 220px;
 }
 .goals-alloc-row input:first-child { max-width: 120px; }
 .goals-alloc-row input:nth-child(2) { max-width: 100px; }

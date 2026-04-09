@@ -60,6 +60,7 @@ const StressTab = ({ data, tt }) => {
   if (!data) return <p className="pb-analytics-empty">{tt('Click "Run" to apply stress scenarios.')}</p>;
   return (
     <div className="pb-analytics-result">
+      <p className="pb-analytics-note">{tt('Stress scenarios are estimated from your current portfolio weights using historical crisis shocks and factor-based assumptions. They are specific to this portfolio, not placeholder numbers.')}</p>
       <table className="pb-analytics-table">
         <thead><tr><th>{tt('Scenario')}</th><th>{tt('Portfolio Impact')}</th></tr></thead>
         <tbody>
@@ -150,6 +151,7 @@ const StyleAnalysisTab = ({ data, tt }) => {
   const ps = data.portfolio_style || {};
   return (
     <div className="pb-analytics-result">
+      <p className="pb-analytics-note">{tt('Style analysis uses real SMB, HML, and market betas from the holdings in your current portfolio to show whether you lean large or small cap, and value or growth.')}</p>
       <div className="pb-analytics-grid" style={{ marginBottom: 12 }}>
         <div className="pb-analytics-stat">
           <span className="pb-stat-label">{tt('Portfolio Style')} <HelpIcon text="Overall style classification based on factor loadings. Size: Small/Mid/Large via SMB beta. Value/Growth via HML beta." /></span>
@@ -309,6 +311,7 @@ const AnalyticsPanel = ({
           );
         })}
       </div>
+      <p className="pb-analytics-note">{tt('Each analytics tab below is calculated from your saved holdings, weights, historical price data, and factor exposures in the database.')}</p>
       <div className="pb-analytics-actions">
         {activeTab === 'backtest' && (
           <label className="pb-cost-input-label">

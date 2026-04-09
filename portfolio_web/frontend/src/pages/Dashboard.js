@@ -74,6 +74,9 @@ const normalizeSavedPortfolio = (portfolio) => {
     }
   }
 
+  const currentValue = holdingsValue > 0 ? holdingsValue : investmentAmount;
+  const actualGain = currentValue - investmentAmount;
+  const actualGainPct = investmentAmount > 0 ? (actualGain / investmentAmount) * 100 : 0;
   const estimatedGain = investmentAmount * (expectedReturnPct / 100);
   const estimatedCurrentValue = investmentAmount + estimatedGain;
 
@@ -81,6 +84,9 @@ const normalizeSavedPortfolio = (portfolio) => {
     ...portfolio,
     holdings,
     investmentAmount,
+    currentValue,
+    actualGain,
+    actualGainPct,
     expectedReturnPct,
     estimatedGain,
     estimatedCurrentValue,
@@ -125,7 +131,7 @@ const aggregateTopHoldings = (portfolios, totalInvested) => {
 
 const Dashboard = ({ apiBase }) => {
   const { tt } = useLanguage();
-  const [stats, setStats] = useState(null);
+  const [, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savedPortfolios, setSavedPortfolios] = useState([]);
   const [savedLoading, setSavedLoading] = useState(false);
@@ -198,9 +204,8 @@ const Dashboard = ({ apiBase }) => {
   const portfolioMetrics = useMemo(() => {
     const activeCount = normalizedPortfolios.length;
     const totalInvested = normalizedPortfolios.reduce((sum, portfolio) => sum + portfolio.investmentAmount, 0);
-    const totalCurrentValue = normalizedPortfolios.reduce((sum, portfolio) => sum + portfolio.estimatedCurrentValue, 0);
-    const totalGainLoss = totalCurrentValue - totalInvested;
-    const totalGainLossPct = totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
+    const fallbackCurrentValue = normalizedPortfolios.reduce((sum, portfolio) => sum + portfolio.currentValue, 0);
+    const projectedCurrentValue = normalizedPortfolios.reduce((sum, portfolio) => sum + portfolio.estimatedCurrentValue, 0);
     const avgExpectedReturn = activeCount > 0
       ? normalizedPortfolios.reduce((sum, portfolio) => sum + portfolio.expectedReturnPct, 0) / activeCount
       : 0;
@@ -209,13 +214,17 @@ const Dashboard = ({ apiBase }) => {
     return {
       activeCount,
       totalInvested,
-      totalCurrentValue,
-      totalGainLoss,
-      totalGainLossPct,
+      fallbackCurrentValue,
+      projectedCurrentValue,
       avgExpectedReturn,
       totalHoldings,
     };
   }, [normalizedPortfolios]);
+
+  const totalCurrentValue = perfData?.current_value ?? portfolioMetrics.fallbackCurrentValue;
+  const totalGainLoss = totalCurrentValue - portfolioMetrics.totalInvested;
+  const totalGainLossPct = perfData?.portfolio_return_pct
+    ?? (portfolioMetrics.totalInvested > 0 ? (totalGainLoss / portfolioMetrics.totalInvested) * 100 : 0);
 
   const trendSeries = perfData?.series || [];
 
@@ -292,20 +301,20 @@ const Dashboard = ({ apiBase }) => {
       <div className="dashboard-kpis-grid">
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>{tt('Projected Portfolio Value')} <HelpIcon text="The estimated 1-year value of all your saved portfolios, based on original investment plus each portfolio's model-expected annual return (Fama-French 5-factor). Not a guarantee of future performance." /></span>
+            <span>{tt('Current Portfolio Value')} <HelpIcon text="The combined market value of all your saved portfolios using the latest available prices. This reflects actual tracked value, not a projection." /></span>
             <FiDollarSign />
           </header>
-          <strong>{formatCurrency(portfolioMetrics.totalCurrentValue)}</strong>
-          <p>{tt('Invested')}: {formatCurrency(portfolioMetrics.totalInvested)}</p>
+          <strong>{formatCurrency(totalCurrentValue)}</strong>
+          <p>{tt('Invested')}: {formatCurrency(portfolioMetrics.totalInvested)} · {tt('Model Estimate')}: {formatCurrency(portfolioMetrics.projectedCurrentValue)}</p>
         </article>
 
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>{tt('Projected Gain/Loss')} <HelpIcon text="Expected annual profit or loss across all your portfolios based on the Fama-French 5-factor model. This is a model estimate, not realized gain." /></span>
-            {portfolioMetrics.totalGainLoss >= 0 ? <FiTrendingUp /> : <FiTrendingDown />}
+            <span>{tt('Current Gain/Loss')} <HelpIcon text="Your actual gain or loss versus the amount invested, based on the latest tracked portfolio value." /></span>
+            {totalGainLoss >= 0 ? <FiTrendingUp /> : <FiTrendingDown />}
           </header>
-          <strong className={portfolioMetrics.totalGainLoss >= 0 ? 'positive' : 'negative'}>{formatCurrency(portfolioMetrics.totalGainLoss)}</strong>
-          <p>{formatPercent(portfolioMetrics.totalGainLossPct, 1)} vs invested capital</p>
+          <strong className={totalGainLoss >= 0 ? 'positive' : 'negative'}>{formatCurrency(totalGainLoss)}</strong>
+          <p>{formatPercent(totalGainLossPct, 1)} vs invested capital</p>
         </article>
 
         <article className="dashboard-glass dashboard-kpi-card">
@@ -319,13 +328,13 @@ const Dashboard = ({ apiBase }) => {
 
         <article className="dashboard-glass dashboard-kpi-card">
           <header>
-            <span>{tt('S&P 500 Return')} <HelpIcon text="The S&P 500 index return for the selected performance period. Compare this to your own portfolio's expected return to gauge relative performance." /></span>
+            <span>{tt('S&P 500 Return')} <HelpIcon text="Return of SPY, a widely used S&P 500 ETF proxy, over the selected period. It gives you a quick benchmark for how the broader U.S. market performed during the same window." /></span>
             <FiBarChart2 />
           </header>
           <strong className={perfData?.sp500_return_pct >= 0 ? 'positive' : 'negative'}>
             {perfData?.sp500_return_pct != null ? formatPercent(perfData.sp500_return_pct, 1) : 'N/A'}
           </strong>
-          <p>Your est. return: {formatPercent(portfolioMetrics.avgExpectedReturn, 1)} /yr</p>
+          <p>{tt('SPY over selected period')} · {tt('Portfolio Return')}: {formatPercent(totalGainLossPct, 1)}</p>
         </article>
       </div>
 
@@ -333,7 +342,7 @@ const Dashboard = ({ apiBase }) => {
         <div className="dashboard-section-head">
           <div>
             <h3>{tt('Performance')}</h3>
-            <p>Combined portfolio value vs S&P 500 (SPY)</p>
+            <p>{tt('Combined saved-portfolio value vs SPY over the selected period')}</p>
           </div>
           <div className="dashboard-period-controls">
             {PERIOD_MONTHS.map((item) => (
@@ -488,9 +497,9 @@ const Dashboard = ({ apiBase }) => {
                   <span>{new Date(item.created_at).toLocaleDateString()}</span>
                 </div>
                 <div className="dashboard-activity-value">
-                  <em>{formatCurrency(item.estimatedCurrentValue)}</em>
-                  <small className={item.estimatedCurrentValue >= item.investmentAmount ? 'positive' : 'negative'}>
-                    {item.estimatedCurrentValue >= item.investmentAmount ? '+' : ''}{formatPercent((item.estimatedCurrentValue - item.investmentAmount) / item.investmentAmount * 100, 1)}
+                  <em>{formatCurrency(item.currentValue)}</em>
+                  <small className={item.currentValue >= item.investmentAmount ? 'positive' : 'negative'}>
+                    {item.currentValue >= item.investmentAmount ? '+' : ''}{formatPercent(item.actualGainPct, 1)}
                   </small>
                 </div>
               </button>
@@ -542,9 +551,9 @@ const Dashboard = ({ apiBase }) => {
                 <strong>{formatCurrency(item.investmentAmount)}</strong>
               </div>
               <div>
-                <p>{tt('Est. Value')}</p>
-                <strong className={item.estimatedCurrentValue >= item.investmentAmount ? 'positive' : 'negative'}>
-                  {formatCurrency(item.estimatedCurrentValue)}
+                <p>{tt('Current Value')}</p>
+                <strong className={item.currentValue >= item.investmentAmount ? 'positive' : 'negative'}>
+                  {formatCurrency(item.currentValue)}
                 </strong>
               </div>
               <div>

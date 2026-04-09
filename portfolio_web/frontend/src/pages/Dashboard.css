@@ -61,7 +61,8 @@
 
 .dashboard-kpi-card strong {
   display: block;
-  font-size: 24px;
+  font-size: 26px;
+  line-height: 1.15;
   margin-bottom: 4px;
   color: #f8fafc;
 }
@@ -87,7 +88,7 @@
 .dashboard-section-head h3 {
   margin: 0;
   color: #f8fafc;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .dashboard-section-head p {

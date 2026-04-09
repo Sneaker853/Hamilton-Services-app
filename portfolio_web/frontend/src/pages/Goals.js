@@ -20,6 +20,7 @@ export default function Goals({ apiBase }) {
   const [rebalanceData, setRebalanceData] = useState({});
   const [portfolios, setPortfolios] = useState([]);
   const [formPortfolioId, setFormPortfolioId] = useState('');
+  const totalAllocationWeight = formAllocations.reduce((sum, row) => sum + (parseFloat(row.weight) || 0), 0);
 
   const fetchGoals = useCallback(async () => {
     try {
@@ -36,7 +37,7 @@ export default function Goals({ apiBase }) {
     } finally {
       setLoading(false);
     }
-  }, [apiBase]);
+  }, [apiBase, tt]);
 
   useEffect(() => { fetchGoals(); }, [fetchGoals]);
 
@@ -52,7 +53,7 @@ export default function Goals({ apiBase }) {
         tickerSearchTimer.current = setTimeout(async () => {
           try {
             const res = await axios.get(`${apiBase}/stocks/search?q=${encodeURIComponent(val.trim())}&limit=6`);
-            setTickerSuggestions(res.data?.stocks || res.data || []);
+            setTickerSuggestions(res.data?.results || res.data?.stocks || []);
           } catch {
             setTickerSuggestions([]);
           }
@@ -150,13 +151,19 @@ export default function Goals({ apiBase }) {
             <input type="text" placeholder={tt('Goal name')} value={formName} onChange={e => setFormName(e.target.value)} required />
             <input type="number" step="0.5" placeholder={tt('Drift threshold %')} value={formThreshold} onChange={e => setFormThreshold(e.target.value)} min="1" max="50" style={{ maxWidth: 140 }} />
             {portfolios.length > 0 && (
-              <select value={formPortfolioId} onChange={e => setFormPortfolioId(e.target.value)}>
+              <select
+                value={formPortfolioId}
+                onChange={e => setFormPortfolioId(e.target.value)}
+                className="goals-linked-select"
+              >
                 <option value="">{tt('No linked portfolio')}</option>
                 {portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             )}
           </div>
-          <div className="goals-alloc-label">{tt('Target Allocations (must sum to 100%)')}</div>
+          <p className="goals-form-note">{tt('Tip: link a saved portfolio to compare your real holdings against this target automatically.')}</p>
+          <div className="goals-alloc-label">{tt('Target Allocations (must sum to 100%)')} · {tt('Current total')}: {totalAllocationWeight.toFixed(1)}%</div>
+          <p className="goals-form-note small">{tt('Example: VTI 50%, VXUS 20%, BND 30%.')}</p>
           {formAllocations.map((row, i) => (
             <div key={i} className="goals-form-row goals-alloc-row">
               <div className="goals-ticker-wrap">

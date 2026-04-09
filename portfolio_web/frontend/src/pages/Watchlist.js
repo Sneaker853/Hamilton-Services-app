@@ -28,7 +28,7 @@ const Watchlist = ({ apiBase }) => {
     } finally {
       setLoading(false);
     }
-  }, [apiBase]);
+  }, [apiBase, tt]);
 
   useEffect(() => {
     fetchWatchlist();
