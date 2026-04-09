@@ -32,7 +32,7 @@ export default function Alerts({ apiBase }) {
     } finally {
       setLoading(false);
     }
-  }, [apiBase]);
+  }, [apiBase, tt]);
 
   useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
 
@@ -92,9 +92,9 @@ export default function Alerts({ apiBase }) {
   };
 
   const conditionLabel = (c, threshold, refPrice) => {
-    if (c === 'above') return `Price ≥ $${threshold.toFixed(2)}`;
-    if (c === 'below') return `Price ≤ $${threshold.toFixed(2)}`;
-    if (c === 'pct_change') return `±${threshold.toFixed(1)}% from $${refPrice ? refPrice.toFixed(2) : '?'}`;
+    if (c === 'above') return `${tt('Price Above')}: $${threshold.toFixed(2)}`;
+    if (c === 'below') return `${tt('Price Below')}: $${threshold.toFixed(2)}`;
+    if (c === 'pct_change') return `${tt('% Change')}: +/-${threshold.toFixed(1)}% (${tt('Now')}: $${refPrice ? refPrice.toFixed(2) : '?'})`;
     return c;
   };
 
