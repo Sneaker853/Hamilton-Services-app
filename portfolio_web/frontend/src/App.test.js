@@ -15,6 +15,19 @@ jest.mock('axios', () => ({
 import App from './App';
 
 describe('App smoke tests', () => {
+  let consoleWarnSpy;
+  let consoleErrorSpy;
+
+  beforeAll(() => {
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    consoleWarnSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
+  });
+
   beforeEach(() => {
     localStorage.clear();
     axios.get.mockResolvedValue({ data: {} });
