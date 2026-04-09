@@ -39,7 +39,7 @@ const SharedPortfolio = ({ apiBase }) => {
       }
     };
     fetchShared();
-  }, [apiBase, shareToken]);
+  }, [apiBase, shareToken, tt]);
 
   if (loading) {
     return (

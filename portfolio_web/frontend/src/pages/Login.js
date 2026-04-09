@@ -80,7 +80,7 @@ const Login = ({ apiBase, fullScreen = false }) => {
     };
 
     run();
-  }, [apiBase]);
+  }, [apiBase, tt]);
 
   useEffect(() => {
     if (emailInputRef.current) {

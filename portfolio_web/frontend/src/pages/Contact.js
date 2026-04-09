@@ -32,7 +32,7 @@ const Contact = () => {
     setSubmitting(true);
 
     try {
-      const response = await axios.post(`${API_BASE}/contact`, {
+      await axios.post(`${API_BASE}/contact`, {
         name, email, subject, message,
       }, { timeout: 15000 });
       setSubmitted(true);
